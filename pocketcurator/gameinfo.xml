@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gameList>
+  <game>
+    <path>./Pocket Curator.sh</path>
+    <name>Pocket Curator</name>
+    <desc>Pocket Curator uses an Emulation Station-like interface allowing you to visually delete games and whole systems with no PC required! You can see the screenshot, description, rating, genre, and origin of the game. Letting you make informed decisions before deleting. It lets you curate your collection right from the convenience of your device.</desc>
+    <genre>Various, Utilities</genre>
+    <developer>tomtombombadil</developer>
+    <rating>1</rating>
+    <releasedate>20260607T000000</releasedate>
+    <image>./pocketcurator/assets/Screenshot-GamesList.jpg</image>
+    <thumbnail>./pocketcurator/assets/Screenshot-GamesList.jpg</thumbnail>
+    <titleshot>./pocketcurator/assets/Screenshot-Systems.jpg</titleshot>
+    <marquee>./pocketcurator/assets/splash.jpg</marquee>
+    <video>./pocketcurator/assets/PocketCurator.mp4</video>
+  </game>
+</gameList>

@@ -1,0 +1,28 @@
+{
+    "version": 3,
+    "name": "pocketcurator.zip",
+    "items": [
+        "Pocket Curator.sh",
+        "pocketcurator"
+    ],
+    "items_opt": null,
+    "attr": {
+        "title": "Pocket Curator",
+        "desc": "On-device ROM and scraped-media cleanup utility with an Emulation Station-style interface. Browse your installed systems, flag games for deletion, and clear ROMs together with their associated images, videos, marquees, manuals, and thumbnails - all without needing a PC or SSH.",
+        "inst": "After installing, launch from your Ports menu. On first run Pocket Curator downloads the Python 3.11 runtime through PortMaster (requires Wi-Fi the first time only). Once the runtime is cached, future launches are fully offline. The carousel pulls per-system logos from whichever Emulation Station theme you currently have installed. When you delete games and exit, EmulationStation refreshes its menu automatically. To give Pocket Curator's own entry an icon, description, and video, run the included 'PocketCuratorMetadataInstall' from your Ports menu once.",
+        "genres": [
+            "tools",
+            "utility"
+        ],
+        "porter": [
+            "tomtombombadil"
+        ],
+        "image": {},
+        "rtr": true,
+        "runtime": "pyxel_2.2.8_python_3.11.squashfs",
+        "reqs": [],
+        "arch": [
+            "aarch64"
+        ]
+    }
+}

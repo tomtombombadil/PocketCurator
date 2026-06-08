@@ -1,0 +1,372 @@
+"""
+Firmware detection and ROM path resolution.
+
+We look in the standard ROM root directories used by the major handheld
+firmwares and return the first one that exists. The PC-development override
+``POCKETCURATOR_ROMS_DIR`` lets you point at a fake roms folder while iterating
+on your desktop.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Optional, List
+
+from .es_config import (
+    find_es_config_dir,
+    load_es_systems,
+    load_hidden_systems,
+)
+
+
+# Probed in priority order. Most firmwares ship one of these.
+#
+# /userdata/roms          - Batocera, Knulli (Batocera-based)
+# /storage/roms           - JELOS, AmberELEC, Rocknix (LibreELEC-based)
+# /roms                   - ArkOS, dArkOS, RetroOZ, TheRA
+# /mnt/mmc/MUOS/info/...  - MuOS has a different shape; handled separately
+# /roms2                  - ArkOS second SD card (RG351V/MP/etc.)
+CANDIDATE_ROOTS: List[str] = [
+    "/userdata/roms",
+    "/storage/roms",
+    "/roms",
+    "/roms2",
+    # MuOS specifically:
+    "/mnt/mmc/MUOS/info/roms",
+    "/mnt/mmc/ROMS",
+]
+
+
+def detect_roms_dir(override: Optional[str] = None) -> Optional[Path]:
+    """
+    Return the first ROM root that exists, or ``None`` if none are found.
+
+    ``override`` wins over autodetection. The environment variable
+    ``POCKETCURATOR_ROMS_DIR`` wins over everything else, so you can override
+    on the command line without editing settings.json.
+    """
+    env = os.environ.get("POCKETCURATOR_ROMS_DIR")
+    if env:
+        p = Path(env).expanduser()
+        return p if p.is_dir() else None
+
+    if override:
+        p = Path(override).expanduser()
+        if p.is_dir():
+            return p
+
+    for c in CANDIDATE_ROOTS:
+        p = Path(c)
+        if p.is_dir():
+            return p
+
+    return None
+
+
+def detect_firmware_name() -> str:
+    """
+    Best-effort firmware identification for display and the log.
+
+    Prefers the launcher-provided ``POCKETCURATOR_CFW`` (PortMaster's
+    ``$CFW_NAME``), which is authoritative. Falls back to filesystem
+    markers only when that's absent (e.g. running on desktop for dev).
+    """
+    cfw = os.environ.get("POCKETCURATOR_CFW", "").strip()
+    if cfw:
+        # Normalize to friendly casing for the few we know; otherwise
+        # return as-is so unusual firmwares still display something real.
+        pretty = {
+            "knulli": "Knulli",
+            "batocera": "Batocera",
+            "rocknix": "ROCKNIX",
+            "jelos": "JELOS",
+            "amberelec": "AmberELEC",
+            "arkos": "ArkOS",
+            "muos": "muOS",
+        }
+        return pretty.get(cfw.lower(), cfw)
+
+    # Filesystem-marker fallback (dev/desktop or missing env)
+    if Path("/storage/.config/distribution/name").exists():
+        try:
+            return Path("/storage/.config/distribution/name").read_text().strip()
+        except OSError:
+            pass
+    if Path("/etc/jelos-release").exists():
+        return "JELOS"
+    if Path("/etc/amberelec-release").exists():
+        return "AmberELEC"
+    if Path("/etc/rocknix-release").exists():
+        return "ROCKNIX"
+    if Path("/etc/knulli-release").exists():
+        return "Knulli"
+    if Path("/userdata/system/batocera.conf").exists():
+        return "Batocera"
+    if Path("/mnt/mmc/MUOS").is_dir() or Path("/opt/muos").is_dir():
+        return "muOS"
+    if Path("/etc/arkos.conf").exists():
+        return "ArkOS"
+    return "unknown"
+
+
+def load_systems_db(package_dir: Path) -> dict:
+    """Read the bundled systems.json that maps shortnames -> metadata."""
+    path = package_dir / "systems.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        # Don't kill the app over the systems DB - just degrade gracefully.
+        print(f"[firmware] failed to load systems.json: {exc}")
+        return {}
+
+
+def discover_systems(roms_dir: Path, systems_db: dict) -> List[dict]:
+    """
+    Return the list of systems Pocket Curator should offer to manage.
+
+    Primary path: read EmulationStation's own config. ES already knows
+    which systems exist, where their ROMs live, what extensions they
+    use, and which ones the user has hidden from their menu. We use
+    that as the source of truth.
+
+    Fallback path: if no ES config is reachable (dev environment, a
+    weird firmware), scan ``roms_dir`` directly using the legacy
+    heuristics. This path keeps the app usable but is strictly worse.
+
+    Each returned dict has::
+
+        {
+            "shortname":  str,     # ES short name, e.g. "snes"
+            "display":    str,     # ES fullname, e.g. "Super Nintendo..."
+            "path":       Path,    # absolute path to the system directory
+            "extensions": [str],   # lower-case, leading-dot file extensions
+            "theme":      str,     # ES theme key for logo lookup
+            "rom_count":  int,     # number of ROMs we counted
+        }
+    """
+    es_dir = find_es_config_dir()
+    if es_dir is not None:
+        print(f"[discover] using ES config at {es_dir}")
+        return _discover_from_es(es_dir)
+
+    print("[discover] no ES config found - falling back to filesystem scan")
+    return _discover_from_filesystem(roms_dir, systems_db)
+
+
+# Systems that legitimately appear in es_systems.cfg but aren't ROM
+# collections we should offer to manage:
+#   ports, tools, emulators - launcher scripts for standalone games,
+#                      utilities, and emulator front-ends; not ROM
+#                      collections.
+#   favorites etc.   - "auto-collections" that ES synthesizes from other
+#                      systems; the actual ROMs live in their real systems.
+#   prboom, mrboom, sdlpop, doom, openbor - bundled game engines that
+#                      look like systems to ES but represent a single
+#                      game's variants (Doom WADs, Bomberman, Prince of
+#                      Persia, OpenBOR mods).
+#   odcommander, vaixterm, pygame - utility "systems" (file manager,
+#                      terminal, pygame runtime category) that aren't
+#                      ROM collections.
+ES_NON_GAME_SYSTEMS = {
+    "ports", "tools", "emulators",
+    "favorites", "recent", "lastplayed", "allgames",
+    "2players", "4players", "kidgames", "music",
+    "custom-collections", "all", "collections",
+    "prboom", "doom", "mrboom", "openbor", "sdlpop", "easyrpg",
+    "stratagus", "tic80", "wasm4", "j2me", "lutris",
+    "odcommander", "vaixterm", "pygame",
+    # Knulli/Batocera screenshot viewer and other firmware utilities
+    "imageviewer", "screenshots",
+    # Single-game engines often shipped as "systems" in es_systems.cfg
+    "cannonball", "devilutionx", "solarus", "duke3d",
+    "quake", "wolf3d", "ecwolf", "rott",
+}
+
+
+def _is_auto_collection(shortname: str) -> bool:
+    """ES synthesizes auto-collections; their entries live elsewhere."""
+    return shortname.startswith("auto-") or shortname in ES_NON_GAME_SYSTEMS
+
+
+def _discover_from_es(es_dir: Path) -> List[dict]:
+    """Authoritative system list from EmulationStation's config."""
+    raw_systems = load_es_systems(es_dir)
+    hidden = load_hidden_systems(es_dir)
+    if hidden:
+        print(f"[discover] honoring ES hidden systems: {sorted(hidden)}")
+
+    out: List[dict] = []
+    skipped_special: List[str] = []
+    for sys in raw_systems:
+        if sys["shortname"] in hidden:
+            continue
+        if _is_auto_collection(sys["shortname"]):
+            skipped_special.append(sys["shortname"])
+            continue
+        path = sys["path"]
+        if not path.is_dir():
+            continue
+        rom_count = _count_candidates(path, sys["extensions"])
+        if rom_count == 0:
+            continue
+        out.append({
+            "shortname":  sys["shortname"],
+            "display":    sys["display"],
+            "path":       path,
+            "extensions": sys["extensions"],
+            "theme":      sys["theme"],
+            "rom_count":  rom_count,
+        })
+
+    if skipped_special:
+        print(f"[discover] skipping non-game ES systems: "
+              f"{sorted(skipped_special)}")
+
+    # Sort by display name so the carousel order matches a user's
+    # general expectation.
+    out.sort(key=lambda s: s["display"].lower())
+    return out
+
+
+def _discover_from_filesystem(roms_dir: Path, systems_db: dict) -> List[dict]:
+    """Legacy heuristic scanner. Used only when ES config is missing."""
+    systems: List[dict] = []
+    try:
+        children = sorted(roms_dir.iterdir(), key=lambda p: p.name.lower())
+    except OSError:
+        return systems
+
+    skip_names = {
+        ".", "..",
+        "ports", "tools", "emulators", "system", "userdata",
+        "media", "themes", "screenshots",
+        "downloaded_images", "downloaded_videos", "downloaded_videos_cache",
+        "bios", "BIOS",
+        "boxart", "marquees", "manuals", "thumbnails", "videos", "images",
+        "lost+found", ".tmp", ".cache", ".trash-0", ".trash-1000",
+        "doom", "prboom", "openbor", "mrboom", "stratagus",
+        "lutris", "j2me", "tic80", "wasm4", "easyrpg",
+    }
+    skip_lower = {n.lower() for n in skip_names}
+    systems_db_lower = {k.lower(): v for k, v in systems_db.items()}
+
+    for entry in children:
+        if not entry.is_dir():
+            continue
+        if entry.name.lower() in skip_lower or entry.name.startswith("."):
+            continue
+
+        meta = systems_db_lower.get(entry.name.lower(), {})
+        display = meta.get("display", entry.name)
+        extensions = [ext.lower() for ext in meta.get("extensions", [])]
+        known_system = entry.name.lower() in systems_db_lower
+
+        rom_count = _count_candidates(entry, extensions)
+        if rom_count == 0:
+            continue
+
+        if not known_system:
+            gl_count = _count_from_gamelist(entry)
+            if gl_count < 2:
+                continue
+
+        systems.append({
+            "shortname":  entry.name,
+            "display":    display,
+            "path":       entry,
+            "extensions": extensions,
+            "theme":      entry.name,
+            "rom_count":  rom_count,
+        })
+
+    return systems
+
+
+def _count_candidates(system_dir: Path, extensions: List[str]) -> int:
+    """
+    Return the number of games for a system.
+
+    gamelist.xml is the sole source of truth. If a system has no
+    gamelist.xml, it has no games as far as Pocket Curator is concerned -
+    even if the directory contains files that look like ROMs by extension.
+    Those "ROMs" are almost always bios files, save states, or other
+    emulator scaffolding that we'd be wrong to surface as games. EmulationStation
+    itself only shows systems with a populated gamelist.xml; we follow
+    the same rule.
+
+    The ``extensions`` parameter is kept for API compatibility but is
+    deliberately unused - the previous filesystem-walk-by-extension
+    fallback was the source of bogus "1 game" / "3 games" entries for
+    systems that had only bios .zip files in their rom folders.
+    """
+    del extensions  # not used; see docstring
+    return _count_from_gamelist(system_dir)
+
+
+
+def _count_from_gamelist(system_dir: Path) -> int:
+    """
+    Count <game> entries in the gamelist that have a <path>. Does not
+    stat the path - if the user has gone to the trouble of scraping a
+    gamelist, we trust it lists real games. Per-entry stat checks made
+    this O(N) in disk seeks on slow SD cards for no real benefit during
+    discovery.
+    """
+    gl = system_dir / "gamelist.xml"
+    if not gl.is_file():
+        return 0
+
+    try:
+        import xml.etree.ElementTree as ET
+        tree = ET.parse(str(gl))
+    except (ET.ParseError, OSError):
+        return 0
+
+    count = 0
+    for game in tree.getroot().iter("game"):
+        path_el = game.find("path")
+        if path_el is not None and path_el.text and path_el.text.strip():
+            count += 1
+    return count
+
+
+def _count_by_extension(system_dir: Path, extensions: List[str]) -> int:
+    """
+    Walk the system folder one level deep, counting files whose extension
+    is in the whitelist.
+    """
+    media_dirs = {"images", "videos", "marquees", "thumbnails",
+                  "manuals", "screenshots", "media", "downloaded_images",
+                  "downloaded_videos", "bios", "saves", "states", "boxart"}
+    count = 0
+    try:
+        for child in system_dir.iterdir():
+            if child.is_dir():
+                if child.name in media_dirs or child.name.startswith("."):
+                    continue
+                # Descend one level for systems that group by sub-folder
+                try:
+                    for sub in child.iterdir():
+                        if sub.is_file() and _looks_like_rom(sub, extensions):
+                            count += 1
+                except OSError:
+                    pass
+            elif child.is_file():
+                if _looks_like_rom(child, extensions):
+                    count += 1
+    except OSError:
+        return 0
+    return count
+
+
+def _looks_like_rom(path: Path, extensions: List[str]) -> bool:
+    name = path.name.lower()
+    if name in ("gamelist.xml", "gamelist.xml.bak", ".gamelist.cache"):
+        return False
+    if name.startswith("."):
+        return False
+    if not extensions:
+        return True
+    return any(name.endswith(ext) for ext in extensions)

@@ -1,0 +1,39 @@
+# Pocket Curator gptokeyb config - Knulli / Batocera variant
+#
+# On Knulli/Batocera, gptokeyb labels buttons by the Nintendo physical
+# convention: the gptk "a" is the SOUTH button (labeled "B" on Nintendo
+# layouts), and "b" is the EAST button (labeled "A"). Rocknix uses the
+# Xbox convention where "a" is the bottom button labeled "A".
+#
+# Same is true for X/Y: the Knulli "x" is the WEST button (labeled "Y"),
+# and "y" is the NORTH button (labeled "X").
+#
+# So to keep the user-facing legend honest ("A Flag, B Back, X Delete,
+# Y Jump"), the Knulli gptk swaps a<->b and x<->y at the mapping layer:
+
+back = f1
+start = tab
+
+# Physical A button (East on Nintendo layout):
+b = enter
+# Physical B button (South):
+a = esc
+# Physical X button (North):
+y = x
+# Physical Y button (West):
+x = y
+
+l1 = pageup
+r1 = pagedown
+l2 = [
+r2 = ]
+
+up = up
+down = down
+left = left
+right = right
+
+left_analog_up = up
+left_analog_down = down
+left_analog_left = left
+left_analog_right = right

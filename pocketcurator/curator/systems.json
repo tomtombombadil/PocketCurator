@@ -1,0 +1,899 @@
+{
+  "_comment": "system_shortname -> { display, aspect, extensions }. aspect is informational; image height is derived from the actual image file's dimensions at render time.",
+  "32x": {
+    "display": "Sega 32X",
+    "aspect": "4:3",
+    "extensions": [
+      ".32x",
+      ".bin",
+      ".md",
+      ".smd",
+      ".zip",
+      ".7z"
+    ]
+  },
+  "3do": {
+    "display": "3DO",
+    "aspect": "4:3",
+    "extensions": [
+      ".iso",
+      ".cue",
+      ".chd",
+      ".zip"
+    ]
+  },
+  "amiga": {
+    "display": "Commodore Amiga",
+    "aspect": "4:3",
+    "extensions": [
+      ".adf",
+      ".ipf",
+      ".dms",
+      ".zip",
+      ".lha"
+    ]
+  },
+  "amigacd32": {
+    "display": "Amiga CD32",
+    "aspect": "4:3",
+    "extensions": [
+      ".iso",
+      ".cue",
+      ".chd",
+      ".zip"
+    ]
+  },
+  "amigacdtv": {
+    "display": "Amiga CDTV",
+    "aspect": "4:3",
+    "extensions": [
+      ".iso",
+      ".cue",
+      ".chd",
+      ".zip"
+    ]
+  },
+  "amstradcpc": {
+    "display": "Amstrad CPC",
+    "aspect": "4:3",
+    "extensions": [
+      ".dsk",
+      ".cdt",
+      ".voc",
+      ".cpr",
+      ".m3u",
+      ".zip"
+    ]
+  },
+  "apple2": {
+    "display": "Apple II",
+    "aspect": "4:3",
+    "extensions": [
+      ".dsk",
+      ".do",
+      ".po",
+      ".woz",
+      ".nib",
+      ".zip"
+    ]
+  },
+  "apple2gs": {
+    "display": "Apple IIgs",
+    "aspect": "4:3",
+    "extensions": [
+      ".2mg",
+      ".dsk",
+      ".do",
+      ".po",
+      ".zip"
+    ]
+  },
+  "arcade": {
+    "display": "Arcade",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z",
+      ".chd"
+    ]
+  },
+  "atari2600": {
+    "display": "Atari 2600",
+    "aspect": "4:3",
+    "extensions": [
+      ".a26",
+      ".bin",
+      ".zip"
+    ]
+  },
+  "atari5200": {
+    "display": "Atari 5200",
+    "aspect": "4:3",
+    "extensions": [
+      ".a52",
+      ".bin",
+      ".zip"
+    ]
+  },
+  "atari7800": {
+    "display": "Atari 7800",
+    "aspect": "4:3",
+    "extensions": [
+      ".a78",
+      ".bin",
+      ".zip"
+    ]
+  },
+  "atari800": {
+    "display": "Atari 800",
+    "aspect": "4:3",
+    "extensions": [
+      ".atr",
+      ".xex",
+      ".cas",
+      ".bin",
+      ".rom",
+      ".zip"
+    ]
+  },
+  "atarijaguar": {
+    "display": "Atari Jaguar",
+    "aspect": "4:3",
+    "extensions": [
+      ".j64",
+      ".jag",
+      ".rom",
+      ".bin",
+      ".zip"
+    ]
+  },
+  "atarilynx": {
+    "display": "Atari Lynx",
+    "aspect": "3:2",
+    "extensions": [
+      ".lnx",
+      ".lyx",
+      ".zip"
+    ]
+  },
+  "atarist": {
+    "display": "Atari ST",
+    "aspect": "4:3",
+    "extensions": [
+      ".st",
+      ".stx",
+      ".msa",
+      ".dim",
+      ".ipf",
+      ".m3u",
+      ".zip"
+    ]
+  },
+  "c64": {
+    "display": "Commodore 64",
+    "aspect": "4:3",
+    "extensions": [
+      ".d64",
+      ".g64",
+      ".tap",
+      ".prg",
+      ".zip"
+    ]
+  },
+  "channelf": {
+    "display": "Fairchild Channel F",
+    "aspect": "4:3",
+    "extensions": [
+      ".bin",
+      ".rom",
+      ".zip"
+    ]
+  },
+  "coleco": {
+    "display": "ColecoVision",
+    "aspect": "4:3",
+    "extensions": [
+      ".col",
+      ".rom",
+      ".bin",
+      ".zip"
+    ]
+  },
+  "cps1": {
+    "display": "Capcom Play System",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z"
+    ]
+  },
+  "cps2": {
+    "display": "Capcom Play System 2",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z"
+    ]
+  },
+  "cps3": {
+    "display": "Capcom Play System 3",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z"
+    ]
+  },
+  "daphne": {
+    "display": "Laserdisc (Daphne)",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".singe"
+    ]
+  },
+  "dos": {
+    "display": "MS-DOS",
+    "aspect": "4:3",
+    "extensions": [
+      ".pc",
+      ".dos",
+      ".zip",
+      ".exe",
+      ".com",
+      ".bat"
+    ]
+  },
+  "dreamcast": {
+    "display": "Sega Dreamcast",
+    "aspect": "4:3",
+    "extensions": [
+      ".cdi",
+      ".gdi",
+      ".chd",
+      ".zip"
+    ]
+  },
+  "famicom": {
+    "display": "Famicom",
+    "aspect": "4:3",
+    "extensions": [
+      ".nes",
+      ".unif",
+      ".unf",
+      ".zip"
+    ]
+  },
+  "fba": {
+    "display": "Final Burn Alpha",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z"
+    ]
+  },
+  "fbneo": {
+    "display": "FinalBurn Neo",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z"
+    ]
+  },
+  "fds": {
+    "display": "Famicom Disk System",
+    "aspect": "4:3",
+    "extensions": [
+      ".fds",
+      ".zip"
+    ]
+  },
+  "gamegear": {
+    "display": "Sega Game Gear",
+    "aspect": "4:3",
+    "extensions": [
+      ".gg",
+      ".zip"
+    ]
+  },
+  "gb": {
+    "display": "Game Boy",
+    "aspect": "10:9",
+    "extensions": [
+      ".gb",
+      ".zip"
+    ]
+  },
+  "gba": {
+    "display": "Game Boy Advance",
+    "aspect": "3:2",
+    "extensions": [
+      ".gba",
+      ".zip"
+    ]
+  },
+  "gbc": {
+    "display": "Game Boy Color",
+    "aspect": "10:9",
+    "extensions": [
+      ".gbc",
+      ".zip"
+    ]
+  },
+  "genesis": {
+    "display": "Sega Genesis",
+    "aspect": "4:3",
+    "extensions": [
+      ".md",
+      ".smd",
+      ".bin",
+      ".gen",
+      ".zip"
+    ]
+  },
+  "intellivision": {
+    "display": "Intellivision",
+    "aspect": "4:3",
+    "extensions": [
+      ".int",
+      ".rom",
+      ".bin",
+      ".zip"
+    ]
+  },
+  "mame": {
+    "display": "MAME",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z",
+      ".chd"
+    ]
+  },
+  "mastersystem": {
+    "display": "Sega Master System",
+    "aspect": "4:3",
+    "extensions": [
+      ".sms",
+      ".zip"
+    ]
+  },
+  "megadrive": {
+    "display": "Sega Mega Drive",
+    "aspect": "4:3",
+    "extensions": [
+      ".md",
+      ".smd",
+      ".bin",
+      ".gen",
+      ".zip"
+    ]
+  },
+  "msx": {
+    "display": "MSX",
+    "aspect": "4:3",
+    "extensions": [
+      ".rom",
+      ".mx1",
+      ".mx2",
+      ".dsk",
+      ".cas",
+      ".zip"
+    ]
+  },
+  "msx1": {
+    "display": "MSX1",
+    "aspect": "4:3",
+    "extensions": [
+      ".mx1",
+      ".rom",
+      ".ri",
+      ".dsk",
+      ".cas",
+      ".zip"
+    ]
+  },
+  "msx2": {
+    "display": "MSX2",
+    "aspect": "4:3",
+    "extensions": [
+      ".mx2",
+      ".rom",
+      ".ri",
+      ".dsk",
+      ".cas",
+      ".zip"
+    ]
+  },
+  "msxturbor": {
+    "display": "MSX Turbo R",
+    "aspect": "4:3",
+    "extensions": [
+      ".rom",
+      ".dsk",
+      ".cas",
+      ".zip"
+    ]
+  },
+  "n64": {
+    "display": "Nintendo 64",
+    "aspect": "4:3",
+    "extensions": [
+      ".z64",
+      ".n64",
+      ".v64",
+      ".zip"
+    ]
+  },
+  "naomi": {
+    "display": "Sega Naomi",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z",
+      ".chd"
+    ]
+  },
+  "nds": {
+    "display": "Nintendo DS",
+    "aspect": "4:3",
+    "extensions": [
+      ".nds",
+      ".zip"
+    ]
+  },
+  "neogeo": {
+    "display": "Neo Geo",
+    "aspect": "4:3",
+    "extensions": [
+      ".zip",
+      ".7z"
+    ]
+  },
+  "neogeocd": {
+    "display": "Neo Geo CD",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".iso",
+      ".chd",
+      ".zip"
+    ]
+  },
+  "neogeocdjp": {
+    "display": "Neo Geo CD (JP)",
+    "aspect": "4:3",
+    "extensions": [
+      ".iso",
+      ".cue",
+      ".chd",
+      ".zip"
+    ]
+  },
+  "nes": {
+    "display": "Nintendo Entertainment System",
+    "aspect": "4:3",
+    "extensions": [
+      ".nes",
+      ".zip"
+    ]
+  },
+  "ngp": {
+    "display": "Neo Geo Pocket",
+    "aspect": "20:19",
+    "extensions": [
+      ".ngp",
+      ".zip"
+    ]
+  },
+  "ngpc": {
+    "display": "Neo Geo Pocket Color",
+    "aspect": "20:19",
+    "extensions": [
+      ".ngc",
+      ".ngp",
+      ".zip"
+    ]
+  },
+  "odyssey2": {
+    "display": "Magnavox Odyssey 2",
+    "aspect": "4:3",
+    "extensions": [
+      ".bin",
+      ".zip"
+    ]
+  },
+  "pc88": {
+    "display": "NEC PC-8800",
+    "aspect": "4:3",
+    "extensions": [
+      ".d88",
+      ".88d",
+      ".cmt",
+      ".t88",
+      ".zip"
+    ]
+  },
+  "pc98": {
+    "display": "NEC PC-9800",
+    "aspect": "4:3",
+    "extensions": [
+      ".hdi",
+      ".hdm",
+      ".fdi",
+      ".d88",
+      ".zip"
+    ]
+  },
+  "pcengine": {
+    "display": "PC Engine / TurboGrafx-16",
+    "aspect": "4:3",
+    "extensions": [
+      ".pce",
+      ".zip"
+    ]
+  },
+  "pcenginecd": {
+    "display": "PC Engine CD",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".chd",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "pcfx": {
+    "display": "PC-FX",
+    "aspect": "4:3",
+    "extensions": [
+      ".iso",
+      ".cue",
+      ".chd",
+      ".zip"
+    ]
+  },
+  "pico8": {
+    "display": "PICO-8",
+    "aspect": "1:1",
+    "extensions": [
+      ".p8",
+      ".png"
+    ]
+  },
+  "playstation": {
+    "display": "PlayStation",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".bin",
+      ".chd",
+      ".pbp",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "pokemini": {
+    "display": "Pokemon Mini",
+    "aspect": "1:1",
+    "extensions": [
+      ".min",
+      ".zip"
+    ]
+  },
+  "ports": {
+    "display": "Ports",
+    "aspect": "16:9",
+    "extensions": [
+      ".sh"
+    ]
+  },
+  "ps": {
+    "display": "PlayStation",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".bin",
+      ".chd",
+      ".pbp",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "ps1": {
+    "display": "PlayStation",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".bin",
+      ".chd",
+      ".pbp",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "ps2": {
+    "display": "PlayStation 2",
+    "aspect": "4:3",
+    "extensions": [
+      ".iso",
+      ".chd",
+      ".bin",
+      ".cso",
+      ".zip"
+    ]
+  },
+  "psp": {
+    "display": "PlayStation Portable",
+    "aspect": "16:9",
+    "extensions": [
+      ".iso",
+      ".cso",
+      ".pbp",
+      ".zip"
+    ]
+  },
+  "psx": {
+    "display": "PlayStation",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".bin",
+      ".chd",
+      ".pbp",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "samcoupe": {
+    "display": "SAM Coupe",
+    "aspect": "4:3",
+    "extensions": [
+      ".mgt",
+      ".sad",
+      ".dsk",
+      ".sbt",
+      ".zip"
+    ]
+  },
+  "satellaview": {
+    "display": "Satellaview",
+    "aspect": "4:3",
+    "extensions": [
+      ".bs",
+      ".sfc",
+      ".smc",
+      ".zip"
+    ]
+  },
+  "saturn": {
+    "display": "Sega Saturn",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".chd",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "scummvm": {
+    "display": "ScummVM",
+    "aspect": "4:3",
+    "extensions": [
+      ".scummvm"
+    ]
+  },
+  "sega32x": {
+    "display": "Sega 32X",
+    "aspect": "4:3",
+    "extensions": [
+      ".32x",
+      ".bin",
+      ".md",
+      ".smd",
+      ".zip"
+    ]
+  },
+  "segacd": {
+    "display": "Sega CD",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".chd",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "sg-1000": {
+    "display": "SG-1000",
+    "aspect": "4:3",
+    "extensions": [
+      ".sg",
+      ".zip"
+    ]
+  },
+  "sgb": {
+    "display": "Super Game Boy",
+    "aspect": "4:3",
+    "extensions": [
+      ".gb",
+      ".gbc",
+      ".sgb",
+      ".zip"
+    ]
+  },
+  "snes": {
+    "display": "Super Nintendo",
+    "aspect": "4:3",
+    "extensions": [
+      ".smc",
+      ".sfc",
+      ".zip"
+    ]
+  },
+  "snes-msu1": {
+    "display": "SNES MSU-1",
+    "aspect": "4:3",
+    "extensions": [
+      ".sfc",
+      ".smc",
+      ".zip"
+    ]
+  },
+  "snesh": {
+    "display": "Super NES (hacks)",
+    "aspect": "4:3",
+    "extensions": [
+      ".sfc",
+      ".smc",
+      ".zip"
+    ]
+  },
+  "supergrafx": {
+    "display": "PC Engine SuperGrafx",
+    "aspect": "4:3",
+    "extensions": [
+      ".sgx",
+      ".pce",
+      ".zip"
+    ]
+  },
+  "tg-cd": {
+    "display": "TurboGrafx-CD",
+    "aspect": "4:3",
+    "extensions": [
+      ".cue",
+      ".chd",
+      ".iso",
+      ".zip"
+    ]
+  },
+  "tg16": {
+    "display": "TurboGrafx-16",
+    "aspect": "4:3",
+    "extensions": [
+      ".pce",
+      ".zip"
+    ]
+  },
+  "thomson": {
+    "display": "Thomson MO/TO",
+    "aspect": "4:3",
+    "extensions": [
+      ".fd",
+      ".sap",
+      ".k7",
+      ".rom",
+      ".m7",
+      ".zip"
+    ]
+  },
+  "uzebox": {
+    "display": "Uzebox",
+    "aspect": "4:3",
+    "extensions": [
+      ".uze",
+      ".hex",
+      ".zip"
+    ]
+  },
+  "vectrex": {
+    "display": "Vectrex",
+    "aspect": "3:4",
+    "extensions": [
+      ".vec",
+      ".bin",
+      ".zip"
+    ]
+  },
+  "vic20": {
+    "display": "Commodore VIC-20",
+    "aspect": "4:3",
+    "extensions": [
+      ".prg",
+      ".t64",
+      ".d64",
+      ".tap",
+      ".crt",
+      ".zip"
+    ]
+  },
+  "videopac": {
+    "display": "Philips Videopac",
+    "aspect": "4:3",
+    "extensions": [
+      ".bin",
+      ".zip"
+    ]
+  },
+  "virtualboy": {
+    "display": "Virtual Boy",
+    "aspect": "1:1",
+    "extensions": [
+      ".vb",
+      ".vboy",
+      ".zip"
+    ]
+  },
+  "wonderswan": {
+    "display": "WonderSwan",
+    "aspect": "14:9",
+    "extensions": [
+      ".ws",
+      ".zip"
+    ]
+  },
+  "wonderswancolor": {
+    "display": "WonderSwan Color",
+    "aspect": "14:9",
+    "extensions": [
+      ".wsc",
+      ".zip"
+    ]
+  },
+  "x1": {
+    "display": "Sharp X1",
+    "aspect": "4:3",
+    "extensions": [
+      ".dx1",
+      ".2d",
+      ".2hd",
+      ".tfd",
+      ".d88",
+      ".cmt",
+      ".zip"
+    ]
+  },
+  "x68000": {
+    "display": "Sharp X68000",
+    "aspect": "4:3",
+    "extensions": [
+      ".dim",
+      ".img",
+      ".d88",
+      ".88d",
+      ".m3u",
+      ".zip"
+    ]
+  },
+  "zx81": {
+    "display": "Sinclair ZX81",
+    "aspect": "4:3",
+    "extensions": [
+      ".p",
+      ".tzx",
+      ".t81",
+      ".zip"
+    ]
+  },
+  "zxspectrum": {
+    "display": "ZX Spectrum",
+    "aspect": "4:3",
+    "extensions": [
+      ".tap",
+      ".tzx",
+      ".z80",
+      ".sna",
+      ".zip"
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+    "_comment": "Pocket Curator runtime config. Safe to edit by hand while the app is closed. Colors are RGB triples; the highlight/accent values follow the Rocknix scheme.",
+    "theme": {
+        "background_color": [
+            18,
+            18,
+            18
+        ],
+        "list_bg_color": [
+            16,
+            18,
+            22
+        ],
+        "panel_bg_color": [
+            18,
+            18,
+            18
+        ],
+        "frame_color": [
+            22,
+            22,
+            22
+        ],
+        "text_color": [
+            230,
+            230,
+            230
+        ],
+        "muted_color": [
+            136,
+            136,
+            136
+        ],
+        "highlight_color": [
+            255,
+            85,
+            85
+        ],
+        "highlight_text_color": [
+            255,
+            255,
+            255
+        ],
+        "flagged_color": [
+            110,
+            110,
+            110
+        ],
+        "legend_bg_color": [
+            10,
+            10,
+            10
+        ],
+        "legend_text_color": [
+            200,
+            200,
+            200
+        ],
+        "accent_color": [
+            255,
+            85,
+            85
+        ],
+        "blue_accent_color": [
+            78,
+            151,
+            209
+        ]
+    },
+    "ui": {
+        "list_width_pct": 0.4,
+        "font_size_base": 22,
+        "marquee_delay_ms": 600,
+        "marquee_speed_px_per_sec": 60,
+        "description_autoscroll": false,
+        "description_autoscroll_speed_px_per_sec": 18,
+        "image_load_debounce_ms": 120,
+        "fps_cap": 30
+    },
+    "behavior": {
+        "deletion_dry_run": false,
+        "confirm_before_delete": true,
+        "include_scraped_media": true
+    },
+    "ratings_display": "stars",
+    "region_display": "text",
+    "roms_dir_override": null,
+    "theme_dir_override": null
+}
