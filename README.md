@@ -74,7 +74,7 @@ PortMaster repository. So Pocket Curator won't ever be downloadable through Port
 ## Requirements
 
    - Retro Handheld with working WiFi connection to the Internet (obviously not all handhelds are supported, see list of tested handhelds below)
-   - Firmware that supports PortMaster
+   - Firmware that supports PortMaster, and one tested with Pocket Curator (see list above)
    - At least one other Port installed (often the Ports system won't show up on the systems carousel until you have an official port installed, I recommend 2048. It's small and quick to install)
    - aarch64 libraries (don't worry, you probably won't know if you have these or not)
 
