@@ -5,7 +5,6 @@ Browse your installed systems and games in an EmulationStation-style carousel,
 then flag and delete ROMs together with their scraped artwork — no PC, no SSH,
 no WiFi, and without pulling the SD card. (* installation requires WiFi and may require a PC)
 
-![Video](pocketcurator/assets/PocketCurator.mp4)
 ![Splash](pocketcurator/assets/splash.jpg)
 ![Systems carousel](pocketcurator/assets/Screenshot-Systems.jpg)
 ![Games list](pocketcurator/assets/Screenshot-GamesList.jpg)
