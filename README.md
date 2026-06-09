@@ -46,19 +46,25 @@ There is no UNDELETE!
 
 For each marked game, Pocket Curator removes the ROM/zip file plus the media its `gamelist.xml` entry explicitly references — `<image>`, `<thumbnail>`, `<marquee>`, `<video>`, and `<manual>`. Only files named in the gamelist entry are touched.
 
-## Supported firmware
+## Targeted Firmwares
 
-   - Rocknix 2026-06-01 or later
-   - Knulli Scarab 2026-05-11 or later
+Pocket Curator was made for Rocknix, plain and simple. But I have enough Knulli devices that I made it work with Knulli as well. That may morph into including other firmwares in the future. Time will tell.
+
+   - Rocknix 2026-06-01 or later - RECOMMENDED
+   - Knulli Scarab 2026-05-11 or later - RECOMMENDED
    
 Recent versions of Rocknix and Knulli are tested and work great! Be sure to update your
 PortMaster installation as well. Without a recent version of both (firmware and PortMaster)
-Pocket Curator will fail.
+Pocket Curator will fail. Previous versions of Rocknix and Knulli are untested.
+
+## Potential Firmwares
+
+I may develop and test on these firmwares, but there's no guarantees.
 
    - Batocera (for handhelds) will likely work, but is untested.
    - AmberELEC main functionality works (deleting games) but ES games list refresh does not. Also Pocket Curator metadata script doesn't work. (only tested briefly)
-   - JELOS might work... (why haven't you upgraded to Rocknix?)
-   - dArkOS - test worked, main functions work, ES games list refresh not working. Initial testing is promising.
+   - JELOS might work... (why haven't you upgraded to Rocknix? No plans to develop for or test on this firmware.)
+   - dArkOS - test worked, main functions work, ES games list refresh is not working. Initial testing is promising.
    - ArkOS - unlikely to test, unlikely to work. This OS is no longer in development.
    - MuOS - untested and unlikely to test or to work
 
