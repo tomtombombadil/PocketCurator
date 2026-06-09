@@ -116,16 +116,11 @@ Misc:
    - R36H (You will need a wifi dongle for the first run!)
    - Kinhank K36 (You will need a wifi dongle for the first run!)
 
-I see no reason Pocket Curator would NOT work on any handheld that is
-   supported by Rocknix or Knulli, so long as it is a 64bit architecture
-   and you can get the device on WiFi for the first run of Pocket Curator.
-   After the first run, Pocket Curator operates without need for WiFi or
-   a PC, or for you to remove your SD card.
+I see no reason Pocket Curator would NOT work on any handheld that is supported by Rocknix or Knulli, so long as it uses the libs.aarch64 libraries and you can get the device on WiFi for the first run of Pocket Curator. After the first run, Pocket Curator operates without need for WiFi, a PC, or for you to remove your SD card.
 
 ## Installation
 
-Pocket Curator is **not** in the PortMaster store, so it's installed manually —
-a one-time copy. After the install and first run everything happens on the device.
+Pocket Curator is **not** in the PortMaster store, so it's installed manually — a one-time copy. After the install and first run everything happens on the device. I hope to implement a built-in updater so that Pocket Curator can update itself from this repository. Obviously that would require a wifi connection.
 
    **Install instructions are still being written and tested!**
    **THANK YOU FOR YOUR PATIENCE!**
@@ -142,8 +137,7 @@ Method #1 - The SD Card Shuffle (we used to call it SneakerNet!)
    - It will scan your gameslists, then take you to a system selection carousel.
 
 Method #2 - The USB Stick Shuffle
-   - Download the Pocket Curator release zip file onto either your PC or your
-   - Android phone or tablet. Even a Chromebook will work. (iPhone might work I'm not that familiar with Apple products)
+   - Download the Pocket Curator release zip file onto either your PC or your Android phone or tablet. Even a Chromebook will work. (iPhone might work I'm not sure)
    - Unzip the Pocket Curator on your PC/phone/tablet and copy the files to your USB stick.
    - Plug your USB stick into your handheld.
    - Use the built-in filemanager in the Tools section of your handheld to copy the files from your USB stick to your roms/ports folder.
@@ -162,22 +156,14 @@ Method #3 - I'm a Nerd's Nerd! (SSH and SAMBA and CLI, oh my!)
    - Open an SSH client on your PC. (I prefer PuTTY!)
    - Connect to your handheld's IP address via SSH.
    - Login with your firmware's username and password. (Rocknix default is root and rocknix. Knulli default is root and linux.)
-   - Change directory to the roms/ports folder. (This location will depend on whether you have one sd card or two and if you're running Rocknix or Knulli)
+   - Change directory to the roms/ports folder. (This location will vary depending on whether you have one sd card or two and if you're running Rocknix or Knulli)
    - You'll see the Pocket Curator zip file there. Unzip it with this command:
             unzip pocketcurator_port-v0.61.9.zip <--- make sure to use the exact filename shown
-                                                 in the directory. It likely includes the version.
+                                                      in the directory. It includes the version.
    - Delete the zip file after it is done unzipping (rm pocketcurator_port-v0.61.9.zip)
    - Exit your SSH session. Close your file explorer window.
-   - On your handheld, go to the Emulation Station Main Menu and select:
-      Game Settings > Update Gameslist
-   to refresh your handheld's games lists. The scroll through your systems to Ports, scroll down to Pocket Curator and select it to run it.
-   - The first time it runs, it will sit at a blank screen for a long moment. Don't panic!
-   - Pocket Curator is downloading resources via PortMaster so that it can run. This only happens on the first run of Pocket Curator, and you do not need WiFi after this to use Pocket Curator (and it won't take that long to load next time either!)
-   
-
-On Rocknix:
-On first run, Pocket Curator downloads the Python runtime through PortMaster.
-**This needs Wi-Fi the first time only** — afterwards it runs fully offline.
+   - On your handheld, go to the Emulation Station Main Menu and select: **Game Settings > Update Gameslist** to refresh your handheld's games lists. The scroll through your systems to Ports, scroll down to Pocket Curator and select it to run it.
+   - The first time it runs, it will sit at a blank screen for a long moment. Don't panic! Pocket Curator is downloading resources via PortMaster so that it can run. This only happens on the first run of Pocket Curator, and you do not need WiFi after this to use Pocket Curator (and it won't take that long to load next time either!)
 
 ## Controls
 
@@ -200,7 +186,8 @@ On first run, Pocket Curator downloads the Python runtime through PortMaster.
    - Select - Settings
 
 ## Settings
-Pressing Select will take you to the Pocket Curator Settings screen.
+
+Pressing Select will take you to the Pocket Curator Settings screen. These settings are available:
    - Font Size - changes the size of the font in Pocket Curator.
    - Auto-scroll description - enabling this will cause the game descriptions on the games list to scroll automatically up and down
    - Safe Mode - enabling this will cause Pocket Curator to NOT delete anything! You can use this to test it out without fear.
