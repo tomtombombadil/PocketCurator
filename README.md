@@ -45,6 +45,23 @@ There is no UNDELETE!
 
 For each marked game, Pocket Curator removes the ROM/zip file plus the media its `gamelist.xml` entry explicitly references — `<image>`, `<thumbnail>`, `<marquee>`, `<video>`, and `<manual>`. Only files named in the gamelist entry are touched.
 
+## Quick Install Instructions for Nerds Who Know What They're Doing
+
+ 1) Boot up your handheld and make sure you have:
+     - up to date firmware
+     - up to date PortMaster
+     - at least ONE Port installed with PortMaster (or Ports won't show as a system in Rocknix)
+     - a good WiFi connection to the Internet for your handheld
+ 2) Download the most recent release zip file from the link to the right
+ 3) Copy this zip file to your handheld's roms/ports folder (make sure you pick the right one, it can vary depending on if your ROMs are on the 'internal' sd card or the 'external' sd card). There's plenty of ways to do this. Feel free to use the samba connection, SSH, SCP, HTTP, or the old classic: remove the sd card and copy the file from your PC.
+ 4) SSH to the handheld and unzip the release zip file. It will create a pocketcurator folder (where all the goodies are) and two .sh scripts: Pocket Curator.sh (this is the one you use to start Pocket Curator) and PocketCuratorMetadataInstall.sh (this is the one you use to populate the Emulation Station metadata for Pocket Curator). You can delete the zip file after you unzip it. NOTE: It is recommended to SSH to the device and unzip the file there instead of unziping it on your PC and copying the files. I've had trouble with Windows corrupting the python with CR/LF in places that should only be LF characters. You've been warned!
+ 5) On your handheld, go into the Emulation Station menu and refresh your games list (or reboot, or restart Emulation Station)
+ 6) Now in the Ports games list, you'll see Pocket Curator and the PocketCuratorMetadataInstall scripts as games. Start the PocketCuratorMetadataInstall one and give it a few seconds. You will see a message about it updating, then Emulation Station will refresh the gameslist. There may be a second or two pause between the message and ES refresh. Don't panic. ;) After the refresh, you can delete PocketCuratorMetadataInstall from your Ports games list (use the ES menu like you would normally)
+ 7) Now you're ready to start Pocket Curator. When you start it the first time it will stay on a blank screen for several seconds. This is normal. Don't panic! Pocket Curator is downloading resources via PortMaster (which is why it needs wifi for the first run).
+ 8) Then it will show the Pocket Curator splash screen. It will stay here for a few seconds as it scans your ROM collection. Depending on the size of your collection, it may take longer. When it's done, you're taken to a system selection carousel that should look very familiar.
+ 9) Use the typical dpad directions and buttons to navigate, just like in Emulation Station.
+ 10) When you exit, if you deleted any games, it will have Emulation Station refresh the games list.
+     
 
 ## Supported firmware
 
