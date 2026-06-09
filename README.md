@@ -102,6 +102,7 @@ Powkiddy:
 TrimUI:
    - Brick
    - Brick Hammer
+   - Smart Pro
    - Smart Pro S
 
 Misc:
