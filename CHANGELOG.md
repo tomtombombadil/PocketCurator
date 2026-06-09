@@ -2,6 +2,71 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.61.13] - 2026-06-09
+
+### EmulationStation refresh (ArkOS family / dArkOS / R36S)
+- Fixed the ~90-second frozen "Refreshing your games list..." screen after a
+  v0.61.12 refresh. ES only processes SIGTERM in its main UI loop, which is
+  suspended while ES waits on a launched port; if `systemctl stop` lands in
+  that window, systemd waits out its default `TimeoutStopSec` (90s) before
+  SIGKILLing. The transient unit now sleeps 3s (letting ES return to its
+  loop), runs the stop in the background, and SIGKILLs the unit if the stop
+  hasn't completed within 5s - the in-flight stop job then finishes
+  immediately, and `Restart=on-failure` doesn't re-trigger on an intentional
+  stop. Typical refresh is now a few seconds; worst case ~8s. SIGKILL is
+  also safer for us: ES can't flush a stale in-RAM gamelist over our edits.
+
+### Console cleanup on exit (ArkOS family)
+- Reset tty1 (`\033c`, as dArkOS's own scripts do) before the refresh
+  messaging, clearing the control-character garbage (`^]` etc.) shown
+  between the app releasing the display and harbourmaster's message.
+- Silenced our own bash "Killed" job notices (wait-after-kill) and stopped
+  `pkill -f gptokeyb` from matching - and killing - its own `sudo pkill`
+  cmdline (bracket pattern `[g]ptokeyb`). PortMaster's pm_finish prints two
+  similar notices from funcs.txt that are outside our tree and may still
+  flash briefly.
+
+
+## [0.61.12] - 2026-06-09
+
+### EmulationStation refresh (ArkOS family / dArkOS / R36S)
+- Added an ArkOS-family branch to the exit-refresh fallback. These firmwares
+  have no `reloadgames` API, so the launcher restarts the ES systemd service
+  after the app exits. The stop -> (metadata re-write) -> start sequence runs
+  via `systemd-run` as a transient unit *outside* the ES cgroup, because the
+  launcher itself is a descendant of the ES service: a normally-forked
+  sequence (even setsid'd) is SIGTERM'd by its own `systemctl stop`, which
+  would strand the device on a black screen with ES down.
+- For `metadata`/`both` refreshes, Pocket Curator's gamelist write happens
+  during the ES-down window (same clobber hazard as Batocera: ES's clean quit
+  flushes dirty in-RAM gamelists over on-disk edits).
+- Last-resort path when passwordless sudo/systemd is unavailable: the dArkOS
+  ES wrapper's native RetroPie `/tmp/es-restart` sentinel + terminating the
+  ES *binary* (identified via `/proc/PID/exe`, never the wrapper script);
+  the wrapper loop relaunches ES, which re-reads gamelists from disk.
+- Metadata installer: when the reload API never answers and an ES systemd
+  service exists, queue one `systemctl restart emulationstation --no-block`
+  so the written metadata actually appears (dArkOS).
+
+## [0.61.11] - 2026-06-09 (test build - superseded, never released)
+
+- First ArkOS-family ES restart attempt using the `/tmp/es-restart` sentinel.
+  Hung dArkOS hard: ES was killed while the app still held DRM master on the
+  kmsdrm display, and the wrapper loop relaunched ES instantly into a display
+  it couldn't acquire, requiring a power cycle. Root-caused and replaced in
+  0.61.12 (refresh now strictly after app exit + cgroup-escaped restart).
+
+## [0.61.10] - 2026-06-09 (test build - folded into 0.61.12)
+
+### Display
+- AmberELEC (RG552) fix: added bundled-SDL (no preload) probes for kmsdrm and
+  x11 ahead of the system-SDL preload variants. AmberELEC's system SDL
+  (2.26.2) is older than the bundled pygame's SDL (2.28.4), so preloading it
+  was rejected as a version downgrade and no driver worked. Wayland stays
+  first, so ROCKNIX/Knulli are unaffected. (dArkOS confirmed working via
+  kmsdrm + system-SDL preload, its SDL 2.32.10 being newer than bundled.)
+
+
 ## [0.61.9] - 2026-06-08
 
 ### Controls

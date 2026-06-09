@@ -99,10 +99,13 @@ pm_message "Installing Pocket Curator metadata. Your Emulation Station gameslist
 # exit. No restart - the reload is in-place.
 seq='
   sleep 8
+  PC_API_OK=0
   for _i in 1 2 3 4 5; do
     "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
     if command -v curl >/dev/null 2>&1; then
-      curl -s -m 8 http://localhost:1234/reloadgames >/dev/null 2>&1
+      if curl -s -m 8 http://localhost:1234/reloadgames >/dev/null 2>&1; then
+        PC_API_OK=1
+      fi
     fi
     sleep 2
     # Stop once our metadata is present and (ES now idle) staying put.
@@ -111,6 +114,22 @@ seq='
     fi
     sleep 2
   done
+  # ArkOS family (incl. dArkOS) has no reloadgames API; the write above
+  # landed on disk but the running ES will not show it (and could flush
+  # a stale copy over it later). Queue one ES service restart so it
+  # re-reads gamelists. --no-block hands the job to PID 1 and returns
+  # immediately: we are inside the ES cgroup, so the restart kills this
+  # very shell - the job must already be queued when that happens. This
+  # is the last statement, so dying then is fine.
+  if [ "$PC_API_OK" != "1" ] \
+      && [ -f /etc/systemd/system/emulationstation.service ] \
+      && command -v systemctl >/dev/null 2>&1; then
+    if [ "$(id -u)" = "0" ]; then
+      systemctl restart emulationstation --no-block
+    else
+      sudo -n systemctl restart emulationstation --no-block
+    fi
+  fi
 '
 if command -v setsid >/dev/null 2>&1; then
   PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" setsid bash -c "$seq" >/dev/null 2>&1 &

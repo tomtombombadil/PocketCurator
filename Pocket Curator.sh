@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.61.9
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.61.13
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -282,10 +282,19 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   if [ -z "$SYS_SDL2" ]; then
     echo "[Pocket Curator] no system libSDL2 found; will only try bundled SDL"
   fi
+  # Probe order (v0.61.10): wayland first so ROCKNIX stays on its fast path,
+  # then for kmsdrm/x11 try the BUNDLED SDL before the system-SDL preload.
+  # AmberELEC's system SDL (2.26.2) is older than the bundled pygame's SDL
+  # (2.28.4), so preloading it is rejected as a version downgrade - bundled
+  # kmsdrm is what works there. On dArkOS the opposite holds (system SDL
+  # 2.32.10 is newer and carries the platform's display support), so the
+  # +sysSDL fallbacks remain right after each bundled attempt.
   probe_attempts=(
     "wayland|wayland|"
     "wayland+sysSDL|wayland|LD_PRELOAD=$SYS_SDL2"
+    "kmsdrm|kmsdrm|"
     "kmsdrm+sysSDL|kmsdrm|LD_PRELOAD=$SYS_SDL2"
+    "x11|x11|"
     "x11+sysSDL|x11|LD_PRELOAD=$SYS_SDL2"
   )
   WORKING_DRIVER=""
@@ -435,6 +444,106 @@ _pc_fallback_restart() {
           ;;
       esac
       ;;
+    arkos*|darkos*)
+      # ArkOS family (incl. dArkOS on R36S). ES runs as a systemd service
+      # (/etc/systemd/system/emulationstation.service) whose wrapper script
+      # ALSO implements the RetroPie /tmp/es-restart sentinel loop. Two
+      # traps shape this code:
+      #
+      #   1. We are a descendant of that service, so we live in its cgroup.
+      #      'systemctl stop/restart' SIGTERMs the whole cgroup - us
+      #      included. A stop -> write -> start sequence forked the normal
+      #      way (even setsid'd) dies at its own 'stop' and strands the
+      #      device on a black screen with ES down. systemd-run launches
+      #      the sequence as a transient unit OUTSIDE our cgroup, so it
+      #      survives the stop it issues.
+      #
+      #   2. (the v0.61.11 hang) ES must never be killed while the app is
+      #      still running: the app holds DRM master on the kmsdrm display,
+      #      and the wrapper's while-true loop relaunches ES instantly into
+      #      a display it cannot acquire. By the time this function runs
+      #      the app has exited and torn down SDL, so a restart is safe.
+      #
+      # Restart (not in-place reload) also re-reads gamelists from disk,
+      # which is the whole point: dArkOS has no localhost:1234 API.
+      local pc_sudo=""
+      [ "$(id -u)" != "0" ] && pc_sudo="sudo -n"
+      if command -v systemctl >/dev/null 2>&1 \
+          && [ -f /etc/systemd/system/emulationstation.service ] \
+          && { [ -z "$pc_sudo" ] || $pc_sudo true 2>/dev/null; }; then
+        local writestep=':'
+        case "$reason" in
+          metadata|both)
+            # Same hazard as Batocera: ES's clean quit flushes any dirty
+            # in-RAM gamelist (e.g. ports, after our own lastplayed bump)
+            # over our on-disk write. So write DURING the down window.
+            # 'systemctl stop' is synchronous - when it returns, ES is
+            # fully down; no pgrep polling needed.
+            writestep='"$PC_PYBIN" -u "$PC_HELPER"'
+            ;;
+        esac
+        local seq='
+          sleep 3
+          # ES SIGTERM handling only happens in its main UI loop, which is
+          # suspended while ES waits on a launched port. If the TERM lands
+          # in that window, systemd waits out TimeoutStopSec (default 90s!)
+          # before SIGKILLing - the user sees a frozen "Refreshing" screen.
+          # So: give ES a moment to return to its loop (sleep 3), run the
+          # stop in the background, and if it has not completed within 5s,
+          # SIGKILL the unit. That completes the in-flight stop job
+          # immediately, and because it is an intentional stop,
+          # Restart=on-failure does not re-trigger. SIGKILL is also safer
+          # for us: ES cannot flush a stale in-RAM gamelist over our edits.
+          systemctl stop emulationstation &
+          pc_stop=$!
+          i=0
+          while kill -0 "$pc_stop" 2>/dev/null && [ "$i" -lt 20 ]; do
+            sleep 0.25; i=$((i+1))
+          done
+          if kill -0 "$pc_stop" 2>/dev/null; then
+            systemctl kill -s SIGKILL emulationstation 2>/dev/null
+          fi
+          wait "$pc_stop" 2>/dev/null
+          '"$writestep"'
+          systemctl start emulationstation
+        '
+        if command -v systemd-run >/dev/null 2>&1; then
+          echo "[Pocket Curator] fallback: systemd-run ES stop -> ($reason) -> start"
+          if $pc_sudo systemd-run --quiet --collect \
+               --setenv=PC_PYBIN="$(_pc_syspython)" \
+               --setenv=PC_HELPER="$GAMEDIR/tools/write_ports_metadata.py" \
+               /bin/bash -c "$seq"; then
+            return
+          fi
+          echo "[Pocket Curator] systemd-run failed; queueing plain restart"
+        fi
+        # No systemd-run (or it failed): queue a plain restart. --no-block
+        # hands the job to PID 1 and returns immediately, so the SIGTERM
+        # sweep that follows can't strand the job half-done when it kills
+        # us. (Skips the metadata re-write, but never leaves ES down.)
+        $pc_sudo systemctl restart emulationstation --no-block 2>/dev/null && return
+        echo "[Pocket Curator] systemctl restart failed; trying sentinel"
+      fi
+      # Last resort (no usable systemd / no passwordless sudo): the
+      # wrapper's native RetroPie convention - flag /tmp/es-restart, then
+      # make the ES *binary* exit; the wrapper loop relaunches it and ES
+      # re-reads gamelists from disk. Safe now for the same reason as
+      # above: the display is already released. pgrep -f matches both the
+      # wrapper (.sh) and the binary, so filter by /proc/PID/exe.
+      echo "[Pocket Curator] fallback: /tmp/es-restart sentinel"
+      touch /tmp/es-restart 2>/dev/null || true
+      local es_pid="" p
+      for p in $(pgrep -f 'emulationstation/emulationstation' 2>/dev/null); do
+        case "$(readlink "/proc/$p/exe" 2>/dev/null)" in
+          */emulationstation) es_pid="$p"; break ;;
+        esac
+      done
+      if [ -n "$es_pid" ]; then
+        kill "$es_pid" 2>/dev/null
+      else
+        echo "[Pocket Curator] could not identify the ES process; skipping refresh"
+      fi
+      ;;
     *)
       echo "[Pocket Curator] no fallback ES-refresh for '$CFW_NAME'; skipping"
       ;;
@@ -468,9 +577,13 @@ echo "[Pocket Curator] python exited with $APP_EXIT"
 # Cleanup. Use pkill -f (like PortMaster) so we also catch gptokeyb2
 # and path-launched instances that `pidof gptokeyb` would miss - a
 # stray gptokeyb feeds phantom input to ES and can auto-launch games.
+# The wait after kill swallows bash's asynchronous "Killed" job notice
+# (which otherwise prints over the console), and the [g] bracket keeps
+# pkill -f from matching - and killing - its own `sudo pkill ...` cmdline.
 kill -9 "$GPTK_PID" 2>/dev/null || true
-$ESUDO pkill -9 -f gptokeyb 2>/dev/null || true
-$ESUDO pkill -9 -f gptokeyb2 2>/dev/null || true
+wait "$GPTK_PID" 2>/dev/null
+$ESUDO pkill -9 -f '[g]ptokeyb' 2>/dev/null || true
+$ESUDO pkill -9 -f '[g]ptokeyb2' 2>/dev/null || true
 
 if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   if [[ "$PM_CAN_MOUNT" != "N" ]]; then
@@ -481,6 +594,16 @@ fi
 unset PYTHONPATH
 unset PYTHONPYCACHEPREFIX
 unset SDL_VIDEODRIVER
+
+# ArkOS-family renders ports on the raw console; the window between the
+# app releasing the display and harbourmaster painting its message shows
+# leftover control-character residue (^] etc) on tty1. Reset it the same
+# way dArkOS's own scripts do.
+case "${CFW_NAME,,}" in
+  arkos*|darkos*)
+    [ -w /dev/tty1 ] && printf '\033c' > /dev/tty1 2>/dev/null
+    ;;
+esac
 
 # If the app left a refresh flag (it does so after deletions), refresh ES
 # in place so removed games drop out of the menu. With no flag, we exit
