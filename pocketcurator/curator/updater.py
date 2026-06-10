@@ -131,7 +131,7 @@ class Updater:
     def status_text(self) -> str:
         """One-liner for the settings row's value column."""
         return {
-            IDLE: "A: check now",
+            IDLE: "",
             CHECKING: "Checking...",
             UP_TO_DATE: "Up to date",
             AVAILABLE: f"v{self.latest_version} found - A: get it",
@@ -325,3 +325,27 @@ class Updater:
 
 class UpdateError(Exception):
     pass
+
+# ----------------------------------------------------------------------
+# Environment probes (used by the Status dialog)
+# ----------------------------------------------------------------------
+
+def clock_is_sane() -> bool:
+    """True when the system clock is recent enough for TLS certificate
+    validation. No-RTC handhelds boot in the past until NTP syncs."""
+    return time.time() >= SANE_CLOCK_EPOCH
+
+
+def check_internet(timeout: int = 5) -> bool:
+    """True when GitHub is reachable over HTTPS. curl exit 22 means an
+    HTTP error status (e.g. rate limited) - the connection itself
+    worked, which is all this probe asks."""
+    if not shutil.which("curl"):
+        return False
+    proc = subprocess.run(
+        ["curl", "-sfI", "--connect-timeout", str(timeout),
+         "-m", str(timeout * 2), "-o", "/dev/null",
+         "https://api.github.com"],
+        capture_output=True)
+    return proc.returncode in (0, 22)
+

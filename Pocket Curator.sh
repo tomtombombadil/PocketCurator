@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.62.0
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.62.1
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -75,8 +75,9 @@ log "applying $(cat "$GAME/.update/READY" 2>/dev/null)"
 #    ship (conf/, logs, flags, settings.json) are untouched by -a copy.
 cp -a "$STAGED/pocketcurator/." "$GAME/" || fail "payload copy"
 
-# 2. The two scripts in the ports root, each copy-then-rename so the
-#    swap of each file is atomic.
+# 2. Scripts in the ports root, each copy-then-rename so the swap of
+#    each file is atomic. (Releases since 0.62.1 ship only the
+#    launcher here; the [ -f ] guard keeps this compatible both ways.)
 for f in "Pocket Curator.sh" "PocketCuratorMetadataInstall.sh"; do
   if [ -f "$STAGED/$f" ]; then
     cp "$STAGED/$f" "$PORTS/.$f.new" || fail "stage $f"
@@ -84,6 +85,13 @@ for f in "Pocket Curator.sh" "PocketCuratorMetadataInstall.sh"; do
     mv -f "$PORTS/.$f.new" "$PORTS/$f" || fail "swap $f"
   fi
 done
+# Pre-0.62.1 installs had the metadata installer in the ports root,
+# where EmulationStation lists it as a launchable entry. It lives in
+# pocketcurator/tools/ now - remove the stray so the menu decluttering
+# actually reaches updated installs.
+if [ ! -f "$STAGED/PocketCuratorMetadataInstall.sh" ]; then
+  rm -f "$PORTS/PocketCuratorMetadataInstall.sh"
+fi
 
 # 3. Only now is the update 'done'.
 rm -rf "$GAME/.update"
@@ -677,27 +685,46 @@ esac
 # If the app left a refresh flag (it does so after deletions), refresh ES
 # in place so removed games drop out of the menu. With no flag, we exit
 # cleanly - no refresh, no message. (Pocket Curator's own metadata is
-# installed separately by PocketCuratorMetadataInstall.sh.)
+# installed separately by tools/install_metadata.sh.)
 if [ -f "$GAMEDIR/.es_refresh_needed" ]; then
   refresh_reason="$(cat "$GAMEDIR/.es_refresh_needed" 2>/dev/null)"
   rm -f "$GAMEDIR/.es_refresh_needed"
 
   case "$refresh_reason" in
-    deletions)
-      refresh_msg="Refreshing your games list..."
+    register)
+      # Our gamelist entry is missing or incomplete (fresh manual
+      # install, or the firmware rebuilt its lists). The metadata
+      # installer schedules its own deferred write + ES refresh - and
+      # that refresh re-reads every gamelist, so it covers this
+      # session's deletions too. No second refresh from us.
+      refresh_msg="Registering Pocket Curator with EmulationStation..."
+      echo "[Pocket Curator] refresh reason='register'"
+      pm_message "$refresh_msg"
+      if [ -f "$GAMEDIR/tools/install_metadata.sh" ]; then
+        PC_SKIP_PMFINISH=1 /bin/bash "$GAMEDIR/tools/install_metadata.sh"
+      else
+        echo "[Pocket Curator] tools/install_metadata.sh missing; plain refresh"
+        refresh_emulationstation "deletions"
+      fi
       ;;
-    metadata)
-      refresh_msg="Setting up Pocket Curator's details..."
-      ;;
-    both|*)
-      refresh_msg="Saving changes and refreshing your games list..."
+    *)
+      case "$refresh_reason" in
+        deletions)
+          refresh_msg="Refreshing your games list..."
+          ;;
+        metadata)
+          refresh_msg="Setting up Pocket Curator's details..."
+          ;;
+        both|*)
+          refresh_msg="Saving changes and refreshing your games list..."
+          ;;
+      esac
+      echo "[Pocket Curator] refresh reason='$refresh_reason'"
+      echo "[Pocket Curator] $refresh_msg"
+      pm_message "$refresh_msg"
+      refresh_emulationstation "$refresh_reason"
       ;;
   esac
-
-  echo "[Pocket Curator] refresh reason='$refresh_reason'"
-  echo "[Pocket Curator] $refresh_msg"
-  pm_message "$refresh_msg"
-  refresh_emulationstation "$refresh_reason"
 fi
 
 pm_finish

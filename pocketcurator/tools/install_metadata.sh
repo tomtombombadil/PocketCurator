@@ -1,12 +1,19 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, PocketCuratorMetadataInstall.sh
 # ===========================================================================
-# Pocket Curator - one-shot metadata installer
+# Pocket Curator - metadata installer (internal tool)
 # ===========================================================================
 # Writes Pocket Curator's own entry (name, description, artwork, video,
 # rating, release date, etc.) into the Ports gamelist and refreshes
-# EmulationStation so it shows up. Run this ONCE from the Ports menu.
-# Afterwards you can delete it or keep it - it's harmless to leave.
+# EmulationStation so it shows up. Lives in pocketcurator/tools/ so it
+# never appears as a launchable entry in EmulationStation's Ports menu.
+#
+# Invoked automatically - users never run this by hand:
+#   - by PocketCurator.Installer.sh right after a fresh install
+#   - by the launcher when the app reports its gamelist entry is
+#     missing or incomplete (e.g. after a manual zip install)
+#
+# Never sets 'favorite' or any other user-preference flag - only the
+# descriptive fields Pocket Curator owns.
 #
 # Why a separate, deferred script:
 # EmulationStation rewrites the ports gamelist from its in-RAM copy every
@@ -138,7 +145,10 @@ else
   disown 2>/dev/null || true
 fi
 
-pm_finish
+# When the launcher invokes us mid-exit it handles PortMaster cleanup
+# itself; calling pm_finish twice double-kills gptokeyb harmlessly but
+# noisily, so the launcher asks us to skip it.
+[ -z "$PC_SKIP_PMFINISH" ] && pm_finish
 exit 0
 
 } # end RAM-load wrapper

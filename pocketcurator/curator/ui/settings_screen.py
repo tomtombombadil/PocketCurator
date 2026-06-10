@@ -29,44 +29,7 @@ def _set_font_size_locked(c, v):
 def _make_options():
     return [
         {
-            "label": "Font size",
-            "kind": "int_range",
-            "min": 14, "max": 80, "step": 2,
-            "get": lambda c: c["ui"]["font_size_base"],
-            "set": _set_font_size_locked,
-            "hint": "Larger = fewer games visible at once.",
-        },
-        {
-            "label": "Auto-scroll description",
-            "kind": "bool",
-            "get": lambda c: bool(c["ui"]["description_autoscroll"]),
-            "set": lambda c, v: c["ui"].__setitem__("description_autoscroll", v),
-            "hint": "Off: use L2 / R2 to scroll manually.",
-        },
-        {
-            "label": "Safe Mode (doesn't delete)",
-            "kind": "bool",
-            "get": lambda c: bool(c["behavior"]["deletion_dry_run"]),
-            "set": lambda c, v: c["behavior"].__setitem__("deletion_dry_run", v),
-            "hint": "On: deletions are simulated only. Test before committing.",
-        },
-        {
-            "label": "Delete scraped media",
-            "kind": "bool",
-            "get": lambda c: bool(c["behavior"]["include_scraped_media"]),
-            "set": lambda c, v: c["behavior"].__setitem__("include_scraped_media", v),
-            "hint": "When a ROM is deleted, also remove its images, videos, marquees, manuals, screenshots, and box art.",
-        },
-        {
-            "label": "Rating display",
-            "kind": "choice",
-            "choices": ["stars", "text"],
-            "get": lambda c: c.get("ratings_display", "stars"),
-            "set": lambda c, v: c.__setitem__("ratings_display", v),
-            "hint": "Graphical stars or a textual 'X.X / 5' label.",
-        },
-        {
-            "label": "Check for updates",
+            "label": "Check For Updates",
             "kind": "action",
             # status/hint/run receive the App, not the config: this row
             # reflects live updater state rather than a settings value.
@@ -74,6 +37,50 @@ def _make_options():
             "dynamic_hint": lambda app: _updater(app).hint_text(),
             "run": lambda app: _updater_action(app),
             "hint": "Checks GitHub for a new release. Needs WiFi.",
+        },
+        {
+            "label": "Status",
+            "kind": "action",
+            "status": lambda app: "",
+            "run": lambda app: _open_status(app),
+            "hint": "Version, firmware, paths, theme, and connection health.",
+        },
+        {
+            "label": "Font Size",
+            "kind": "int_range",
+            "min": 14, "max": 80, "step": 2,
+            "get": lambda c: c["ui"]["font_size_base"],
+            "set": _set_font_size_locked,
+            "hint": "Larger = fewer games visible at once.",
+        },
+        {
+            "label": "Auto-Scroll Description",
+            "kind": "bool",
+            "get": lambda c: bool(c["ui"]["description_autoscroll"]),
+            "set": lambda c, v: c["ui"].__setitem__("description_autoscroll", v),
+            "hint": "Off: use L2 / R2 to scroll manually.",
+        },
+        {
+            "label": "Safe Mode (Doesn't Delete)",
+            "kind": "bool",
+            "get": lambda c: bool(c["behavior"]["deletion_dry_run"]),
+            "set": lambda c, v: c["behavior"].__setitem__("deletion_dry_run", v),
+            "hint": "On: deletions are simulated only. Test before committing.",
+        },
+        {
+            "label": "Delete Scraped Media",
+            "kind": "bool",
+            "get": lambda c: bool(c["behavior"]["include_scraped_media"]),
+            "set": lambda c, v: c["behavior"].__setitem__("include_scraped_media", v),
+            "hint": "When a ROM is deleted, also remove its images, videos, marquees, manuals, screenshots, and box art.",
+        },
+        {
+            "label": "Rating Display",
+            "kind": "choice",
+            "choices": ["stars", "text"],
+            "get": lambda c: c.get("ratings_display", "stars"),
+            "set": lambda c, v: c.__setitem__("ratings_display", v),
+            "hint": "Graphical stars or a textual 'X.X / 5' label.",
         },
     ]
 
@@ -216,20 +223,6 @@ class SettingsScreen:
 
             y += row_h
 
-        # Environment info block (OS / ROMs Location / Theme), relocated
-        # here from the old system-browser subtitle. Sits just above the
-        # hint line.
-        info_lines = [
-            f"OS:  {self.app.firmware_name}",
-            f"ROMs Location:  {self.app.roms_dir if self.app.roms_dir else 'n/a'}",
-            f"Theme:  {self.app.theme_dir.name if self.app.theme_dir else 'n/a'}",
-        ]
-        info_line_h = hint_font.get_linesize()
-        info_y = surface.get_height() - 70 - info_line_h * len(info_lines) - 12
-        for i, line in enumerate(info_lines):
-            surf = hint_font.render(line, True, tuple(theme["muted_color"]))
-            surface.blit(surf, (40, info_y + i * info_line_h))
-
         # Hint for selected option (action rows carry a live hint)
         opt = self.options[self.selected]
         hint_text = (opt["dynamic_hint"](self.app)
@@ -242,3 +235,7 @@ class SettingsScreen:
             "Up/Down: choose   -   Left/Right: change   -   B: back",
             True, tuple(theme["legend_text_color"]))
         surface.blit(legend, (40, surface.get_height() - 36))
+
+def _open_status(app):
+    from .status_screen import StatusScreen
+    app.push_screen(StatusScreen(app))

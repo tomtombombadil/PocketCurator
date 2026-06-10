@@ -144,7 +144,7 @@ else
 fi
 rm -f "$WORK_ZIP"
 chmod +x "$PORTS_DIR/Pocket Curator.sh" \
-         "$PORTS_DIR/PocketCuratorMetadataInstall.sh" 2>/dev/null
+         "$GAMEDIR/tools/install_metadata.sh" 2>/dev/null
 
 # ---- metadata + ES refresh ---------------------------------------------------
 # The metadata installer writes our icon/description/video into the Ports
@@ -152,8 +152,11 @@ chmod +x "$PORTS_DIR/Pocket Curator.sh" \
 # supported firmware (reload API, or service restart on ArkOS-family) -
 # which also makes the new 'Pocket Curator' entry itself appear.
 say "$tag installed - registering with EmulationStation..."
-if [ -f "$PORTS_DIR/PocketCuratorMetadataInstall.sh" ]; then
-  /bin/bash "$PORTS_DIR/PocketCuratorMetadataInstall.sh" >> "$LOGF" 2>&1
+if [ -f "$GAMEDIR/tools/install_metadata.sh" ]; then
+  PC_SKIP_PMFINISH=1 /bin/bash "$GAMEDIR/tools/install_metadata.sh" >> "$LOGF" 2>&1
+elif [ -f "$PORTS_DIR/PocketCuratorMetadataInstall.sh" ]; then
+  # Releases before 0.62.1 shipped it in the ports root.
+  PC_SKIP_PMFINISH=1 /bin/bash "$PORTS_DIR/PocketCuratorMetadataInstall.sh" >> "$LOGF" 2>&1
 fi
 
 say "done! Pocket Curator $tag will appear in Ports momentarily."

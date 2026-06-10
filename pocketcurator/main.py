@@ -42,13 +42,25 @@ def main() -> int:
     # (an in-place reload). If nothing was deleted, no flag is written and
     # the launcher exits cleanly with no refresh.
     #
-    # Note: writing Pocket Curator's OWN metadata is handled separately by
-    # PocketCuratorMetadataInstall.sh, which defers the write until ES is
-    # idle - the only moment a write to our existing entry survives ES's
-    # game-exit gamelist flush.
+    # Self-registration: if our own entry is missing or incomplete in the
+    # ports gamelist (fresh manual install, or a firmware that rebuilt its
+    # lists), ask the launcher to run the metadata installer. Its deferred
+    # write + refresh also picks up this session's deletions, so 'register'
+    # supersedes 'deletions'. The write itself must NOT happen here: ES
+    # rewrites our node from its in-RAM copy on its game-exit flush, so
+    # only the deferred/ES-down write sticks.
     try:
+        reason = ""
         if bool(getattr(app, "deletions_occurred", False)):
-            (here / ".es_refresh_needed").write_text("deletions", encoding="utf-8")
+            reason = "deletions"
+        try:
+            from curator.ports_gamelist import entry_needs_metadata
+            if entry_needs_metadata(here.parent):
+                reason = "register"
+        except Exception:
+            pass
+        if reason:
+            (here / ".es_refresh_needed").write_text(reason, encoding="utf-8")
     except Exception:
         pass
 

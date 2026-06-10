@@ -2,6 +2,36 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.62.1] - 2026-06-10
+
+### Settings
+- "Check For Updates" moved to the top of the list; its idle row no
+  longer shows placeholder text.
+- New "Status" dialog (modal, like the delete confirmation): Pocket
+  Curator version with a latest/update-available indicator, detected OS,
+  ROMs location, active theme, internet reachability, and whether the
+  clock is synced well enough for secure connections. Network rows are
+  probed in the background and read "No Internet Connection" when
+  offline. The OS/ROMs/Theme block at the bottom of Settings moved into
+  this dialog.
+- Settings menu item names are now Title Case.
+
+### Metadata installer relocated (ports-menu decluttering)
+- PocketCuratorMetadataInstall.sh no longer ships in the ports root, so
+  EmulationStation no longer lists it as a launchable entry. The logic
+  moved to pocketcurator/tools/install_metadata.sh, invoked
+  automatically by the one-file installer and by the launcher.
+- Self-registration: on exit, the app checks whether its own entry is
+  missing or incomplete in the ports gamelist (e.g. after a manual zip
+  install) and, if so, has the launcher run the metadata installer -
+  whose refresh also covers that session's deletions. Manual installs
+  now register themselves on first exit; no user action needed.
+- Updating from an earlier release deletes the stray script from the
+  ports root.
+- Verified: the metadata writer sets only Pocket Curator's descriptive
+  fields. It does not set 'favorite' or any other user-preference flag.
+
+
 ## [0.62.0] - 2026-06-10
 
 ### One-file installer (new)
