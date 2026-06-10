@@ -65,7 +65,40 @@ def _make_options():
             "set": lambda c, v: c.__setitem__("ratings_display", v),
             "hint": "Graphical stars or a textual 'X.X / 5' label.",
         },
+        {
+            "label": "Check for updates",
+            "kind": "action",
+            # status/hint/run receive the App, not the config: this row
+            # reflects live updater state rather than a settings value.
+            "status": lambda app: _updater(app).status_text(),
+            "dynamic_hint": lambda app: _updater(app).hint_text(),
+            "run": lambda app: _updater_action(app),
+            "hint": "Checks GitHub for a new release. Needs WiFi.",
+        },
     ]
+
+
+def _updater(app):
+    """Create the updater lazily on first visit to the row, so app
+    startup pays nothing for it."""
+    if getattr(app, "updater", None) is None:
+        from .. import __version__
+        from ..updater import Updater
+        app.updater = Updater(app.port_dir, __version__)
+    return app.updater
+
+
+def _updater_action(app):
+    """A-press behavior depends on state: check when idle/failed/up to
+    date (a re-check is always harmless), download when one is found,
+    nothing while busy or staged."""
+    u = _updater(app)
+    if u.busy() or u.state == "staged":
+        return
+    if u.state == "available":
+        u.start_download()
+    else:
+        u.start_check()
 
 
 class SettingsScreen:
@@ -92,15 +125,20 @@ class SettingsScreen:
         elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             self._adjust(+1 if event.key == pygame.K_RIGHT else -1)
         elif event.key == pygame.K_RETURN:
-            # A on a bool toggles, on a choice cycles forward.
+            # A on a bool toggles, on a choice cycles forward, on an
+            # action runs it.
             opt = self.options[self.selected]
             if opt["kind"] == "bool":
                 self._adjust(+1)
             elif opt["kind"] == "choice":
                 self._adjust(+1)
+            elif opt["kind"] == "action":
+                opt["run"](self.app)
 
     def _adjust(self, delta: int) -> None:
         opt = self.options[self.selected]
+        if opt["kind"] == "action":
+            return
         cur = opt["get"](self.app.config)
         if opt["kind"] == "int_range":
             new = max(opt["min"], min(opt["max"], cur + delta * opt["step"]))
@@ -160,11 +198,14 @@ class SettingsScreen:
             label = row_font.render(opt["label"], True, label_color)
             surface.blit(label, (40, y + 4))
 
-            value = opt["get"](cfg)
-            if opt["kind"] == "bool":
-                value_str = "On" if value else "Off"
+            if opt["kind"] == "action":
+                value_str = opt["status"](self.app)
             else:
-                value_str = str(value)
+                value = opt["get"](cfg)
+                if opt["kind"] == "bool":
+                    value_str = "On" if value else "Off"
+                else:
+                    value_str = str(value)
             value_color = (tuple(theme["highlight_text_color"]) if is_sel
                            else tuple(theme["accent_color"]))
             value_surf = row_font.render(value_str, True, value_color)
@@ -189,9 +230,11 @@ class SettingsScreen:
             surf = hint_font.render(line, True, tuple(theme["muted_color"]))
             surface.blit(surf, (40, info_y + i * info_line_h))
 
-        # Hint for selected option
+        # Hint for selected option (action rows carry a live hint)
         opt = self.options[self.selected]
-        hint = hint_font.render(opt["hint"], True, tuple(theme["muted_color"]))
+        hint_text = (opt["dynamic_hint"](self.app)
+                     if "dynamic_hint" in opt else opt["hint"])
+        hint = hint_font.render(hint_text, True, tuple(theme["muted_color"]))
         surface.blit(hint, (40, surface.get_height() - 70))
 
         # Legend

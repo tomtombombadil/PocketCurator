@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.61.13
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.62.0
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -28,6 +28,75 @@ shopt -s expand_aliases
 
 XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
 SCRIPT_DIR="$(dirname "$0")"
+
+# ===========================================================================
+# Apply a staged update, if the in-app updater left one.
+# ===========================================================================
+# The updater downloads, verifies, and extracts the new release into
+# pocketcurator/.update/staged/ and writes the READY flag LAST - so if
+# READY exists, the staged tree is complete. We apply it here, at the
+# very start of a launch, before any of our code is running.
+#
+# The actual file replacement runs from a helper copied to /tmp because
+# this script is about to overwrite ITSELF, and bash reads scripts
+# incrementally from disk. The helper finishes the swap and then execs
+# the NEW launcher, so the user gets the new version this very session.
+#
+# Crash safety: payload first, the two launcher scripts last (each via
+# copy-then-rename), and .update/ is removed only after everything
+# succeeded. A power cut mid-apply leaves READY in place, so the apply
+# simply re-runs on the next launch. The staged tree never contains
+# settings.json (the updater prunes it), so user settings survive.
+PC_UPDATE_DIR="$SCRIPT_DIR/pocketcurator/.update"
+if [ -z "$PC_SKIP_UPDATE" ] && [ -f "$PC_UPDATE_DIR/READY" ] \
+    && [ -f "$PC_UPDATE_DIR/staged/Pocket Curator.sh" ]; then
+  PC_NEW_VER="$(cat "$PC_UPDATE_DIR/READY" 2>/dev/null)"
+  echo "[Pocket Curator] applying staged update v${PC_NEW_VER}..."
+  PC_APPLY="/tmp/pc_apply_update.$$.sh"
+  cat > "$PC_APPLY" <<'PCAPPLY'
+#!/bin/bash
+# Pocket Curator update applier. Args: <ports_dir> <original args...>
+PORTS="$1"; shift
+GAME="$PORTS/pocketcurator"
+STAGED="$GAME/.update/staged"
+LOGF="$GAME/update.log"
+log() { echo "[pc-update] $*"; echo "$(date '+%F %T') $*" >> "$LOGF" 2>/dev/null; }
+
+fail() {
+  log "FAILED: $*"
+  log "update left staged; will retry next launch"
+  # Run whatever launcher is on disk, but don't loop into another apply.
+  PC_SKIP_UPDATE=1 exec /bin/bash "$PORTS/Pocket Curator.sh" "$@"
+}
+
+log "applying $(cat "$GAME/.update/READY" 2>/dev/null)"
+
+# 1. Payload (everything under pocketcurator/). Runtime files we don't
+#    ship (conf/, logs, flags, settings.json) are untouched by -a copy.
+cp -a "$STAGED/pocketcurator/." "$GAME/" || fail "payload copy"
+
+# 2. The two scripts in the ports root, each copy-then-rename so the
+#    swap of each file is atomic.
+for f in "Pocket Curator.sh" "PocketCuratorMetadataInstall.sh"; do
+  if [ -f "$STAGED/$f" ]; then
+    cp "$STAGED/$f" "$PORTS/.$f.new" || fail "stage $f"
+    chmod +x "$PORTS/.$f.new" 2>/dev/null
+    mv -f "$PORTS/.$f.new" "$PORTS/$f" || fail "swap $f"
+  fi
+done
+
+# 3. Only now is the update 'done'.
+rm -rf "$GAME/.update"
+sync 2>/dev/null
+log "applied OK; relaunching"
+PC_UPDATE_JUST_APPLIED=1 exec /bin/bash "$PORTS/Pocket Curator.sh" "$@"
+PCAPPLY
+  chmod +x "$PC_APPLY"
+  exec /bin/bash "$PC_APPLY" "$SCRIPT_DIR" "$@"
+fi
+if [ -n "$PC_UPDATE_JUST_APPLIED" ]; then
+  echo "[Pocket Curator] update applied successfully"
+fi
 
 # Locate PortMaster. Test for control.txt itself so a broken PM install
 # doesn't win the check.

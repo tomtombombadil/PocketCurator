@@ -2,6 +2,42 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.62.0] - 2026-06-10
+
+### One-file installer (new)
+- New release asset `PocketCurator.Installer.sh`: copy this single file
+  into the ports folder, launch it from EmulationStation with WiFi on, and
+  it downloads the latest release from GitHub, verifies it (SHA256 +
+  zip integrity), installs it, runs the metadata install, and refreshes
+  ES so Pocket Curator appears immediately. Always fetches the latest
+  release, so the installer never goes stale. Re-running it later
+  reinstalls/repairs without touching user settings.
+- Installer preflights the classic failure modes: missing curl/unzip,
+  low disk space (<60 MB), and the no-RTC wrong-clock TLS trap (warns
+  the user to stay on WiFi a minute and retry instead of failing
+  cryptically).
+
+### In-app updater (new)
+- Settings now has "Check for updates": queries GitHub's latest release,
+  and on confirmation downloads (~5 MB, live progress), verifies SHA256 +
+  zip integrity, and stages the update. The launcher applies it at the
+  start of the next launch and relaunches straight into the new version.
+- Staged-apply design: nothing touches the live install until the next
+  launch; the READY flag is written only after a verified stage; a power
+  cut mid-apply re-runs the apply on the following launch; the launcher
+  self-replacement runs from a /tmp helper (bash reads scripts
+  incrementally, so a script must never overwrite itself in place);
+  settings.json is pruned from staged trees so updates can never clobber
+  user settings.
+- All network I/O uses the system curl (firmware CA store) rather than
+  the bundled python's ssl, and failures map to human-readable causes:
+  no WiFi, GitHub rate limit, and the no-RTC wrong-clock TLS failure.
+
+### Release process
+- Every release now publishes a `pocketcurator_port-vX.XX.X.zip.sha256`
+  alongside the zip; updater and installer verify against it.
+
+
 ## [0.61.13] - 2026-06-09
 
 ### EmulationStation refresh (ArkOS family / dArkOS / R36S)
