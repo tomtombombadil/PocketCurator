@@ -1,46 +1,39 @@
 # Pocket Curator
 
 **An on-device ROM and scraped-media cleanup tool for retro handhelds.**
-Browse your installed systems and games in an EmulationStation-style carousel,
-then flag and delete ROMs together with their scraped artwork — no PC, no SSH,
-no WiFi, and without pulling the SD card. (* installation requires WiFi and may require a PC)
+Browse your installed systems and games in an Emulation-Station-style interface, then mark and delete ROMs together with their scraped files. No PC, no SSH, no SAMBA, no WiFi, no SD card swapping. 
+(* installation requires Internet connection and may require a PC, after you install, Internet connectivity is unnecessary)
 
 ![Splash](pocketcurator/assets/splash.jpg)
 ![Systems carousel](pocketcurator/assets/Screenshot-Systems.jpg)
 ![Games list](pocketcurator/assets/Screenshot-GamesList.jpg)
 
-> **Status:** beta (v0.61.9). Extensively tested on Rocknix and Knulli. Other PortMaster
-capable firmwares **may** work but are untested.
-
 ## Why This Exists
 
-Most handheld firmwares let you delete a game from the menu. It's not a simple or quick
-process. It usually involves holding a button, scrolling through a menu, and selecting
-that item from the menu. That doesn't sound like a lot, and it isn't if you're only
-deleting one game. But when you're trying to weed your collection, or trying to
-make room for another large game, that's where Pocket Curator comes to the rescue!
+Let's face it, unless you're one of those hyper-organized people with a finely curated collection of ROMs, you probably have THOUSANDS of ROMs you don't want or need. Sure, it feels good to have EVERY SINGLE ROM EVER, but after the initial shine wears off, you realize that you need to trim the collection down to what works for YOU. Pocket Curator is here to help with that.
 
-Pocket Curator lets you scroll through your games lists just like Emulation Station.
-Pocket Curator shows you the metadata including a screenshot, description, rating,
-genre, and region. This lets you make an informed decision, rather than selecting
-filenames on an SD card and hoping you got the right one - or worse not knowing
-what that game even is. In a world where these handhelds ship with THOUSANDS of games
-on them, this is a necessary tool to tidy up your games lists.
+Pocket Curator helps you:
+   - Trim the fat from your collection right on the device
+   - Gives you a visual way to remove ROMs you don't want
+   - Shows the ROM's screenshot and description and details letting you make an informed decision
+   - Deletes not only the ROM files, but also the scraped files associated with the ROM, giving you precious space back
+   - Multiple deletes are EASY! No faffing about through menus. No wearing your thumbs out.
+   - Mark as many ROMs for deletion as you want, then with two button presses delete the all the marked ROMs and their scraped files.
 
-Pocket Curator lets you flag multiple files at a time! Delete them with two button presses.
-One press of X and it shows you a list of what you're about to delete and how much space
-you'll recover. Press X again to delete those games and all their scraped media. Press B
-to cancel. It's intuitive and fast!
+How does deleting ROMs work in Pocket Curator?
+Simple. You're in a visual interface that looks just like Emulation Station. (sorry, your themes aren't implemented) You scroll through the games list, just like you do in Emulation Station. Press A to mark a game to be deleted. Keep scrolling and marking. When you're done marking, press X to view a list of what you're about to delete and how much space you'll get back. Press X again to confirm the delete and the games and their scraped files are deleted. When you exit Pocket Curator, it automatically refreshes your games list. Easy, fast, and efficient!
 
-When Pocket Curator exits, it automatically updates your gameslist.xml files by making
-Emulation Station refresh them. This removes the deleted games from the Emulation Station
-lists, and saves you from the extra button pushing to go through the menus and refresh
-the lists yourself.
+Sure, there are tools to weed ROM collections on your PC. And if that's your thing, you do you. Enjoy. If that's not your thing, then Pocket Curator is the answer. Frankly: I find weeding on my PC to be a real chore. I'm far more likely to do a little cleanup here and there, especially when I can do it right on the handheld. Pocket Curator will lets you do that.
 
-Pocket Curator is a powerful deletion tool. You can even delete whole systems! Tired of
-Game Boy Advance? One press of X at the systems carousel and a confirmation, and it will
-delete all the games and scraped media for that game system! Be careful with this one.
-There is no UNDELETE!
+Pocket Curator makes a couple assumptions about you and your ROM collection:
+   - You already scraped all your ROMs (you might have gotten them that way from a vendor)
+   - You have a bunch of ROMs that are just cluttering up your games lists preventing you from focusing on and playing the real gems
+   - You just can't be bothered swapping your sd card back to your PC and installing/configuring programs to weed the collection over there
+   - You just want an easier way to delete ROMs right from Emulation Station
+
+Most handheld firmwares let you delete a game from the menu. Frankly that process takes way too many button presses. It usually involves holding a button, scrolling through a menu, and selecting that item from the menu. That doesn't sound like a lot, and it isn't for one or two games. But when you're trying to weed your collection, or trying to make room for another large game, that's where Pocket Curator comes to the rescue!
+
+Pocket Curator is a powerful deletion tool. You can even delete whole systems! Tired of seeing Amstrad CPC in your systems list? (How'd it even get there? LOL) One press of X at the systems carousel and a confirmation, and it will delete all the games and scraped media for that whole game system! Be careful with this one. There is no UNDELETE!
 
 ## What Gets Deleted
 
@@ -48,34 +41,38 @@ For each marked game, Pocket Curator removes the ROM/zip file plus the media its
 
 ## Targeted Firmwares
 
-Pocket Curator was made for Rocknix, plain and simple. But I have enough Knulli devices and other handhelds that I made it work with Knulli, dArkOS, and Batocera as well. AmberELEC is partially working (the important parts work).
+Pocket Curator was made for Rocknix, plain and simple. But I have enough other handhelds that I made it work with Knulli, dArkOS, Batocera, and AmberELEC as well.
 
    - Rocknix 2026-06-01 or later - RECOMMENDED
    - Knulli Scarab 2026-05-11 or later - RECOMMENDED
    - dArkOS 06072026 or later (only tested on R36S)
-   - Batocera v39 2024-03-05 (only RG552 tested)
+   - Batocera v39 2024-03-05 (only tested on RG552)
+   - AmberELEC 2023-02-03 (only tested on RG552)
    
-Recent versions of Rocknix and Knulli are tested and work great! Be sure to update your
-PortMaster installation as well. Without a recent version of both (firmware and PortMaster)
-Pocket Curator will fail. Previous versions of Rocknix and Knulli are untested.
+Be sure to update your PortMaster installation as well as install the latest version of your firmware. Without a recent version of both (firmware and PortMaster) Pocket Curator will likely fail. Previous versions of firmwares listed above are untested.
 
-## Potential Firmwares
+## Unsupported Firmwares
 
-I may develop and test on these firmwares, but there's no guarantees.
+It is VERY unlikely that I will do any development for the below firmwares or any unlisted firmwares:
 
-   - AmberELEC 2023-02-03 - automatic Emulation Station refresh not working, metadata population not working, main functionality working (only briefly tested)
+   - ArkOS - untested and unlikely to work. This OS is no longer in development.
+   - EmuELEC - untested... it might work
+   - GarlicOS - untested and unlikely to work
    - JELOS might work... (why haven't you upgraded to Rocknix? No plans to develop for or test on this firmware.)
-   - ArkOS - unlikely to test, unlikely to work. This OS is no longer in development.
-   - MuOS - untested and unlikely to test or to work
+   - MuOS - untested and unlikely to work
+   - MinUI - untested and unlikely to work
+   - OnionOS - untested and unlikely to work
+   - PAN4ELEC - untested... it might work
 
 (The number of untested/unsupported firmwares listed above are likely the reason this 'port' won't ever get picked up into the official
-PortMaster repository. So Pocket Curator won't ever be downloadable through PortMaster)
+PortMaster repository. So Pocket Curator won't ever be downloadable through the PortMaster ports library)
 
 ## Requirements
 
-   - Retro Handheld with working WiFi connection to the Internet (obviously not all handhelds are supported, see list of tested handhelds below)
-   - Firmware that supports PortMaster, and one tested with Pocket Curator (see list above)
-   - At least one other Port installed (often the Ports system won't show up on the systems carousel until you have an official port installed, I recommend 2048. It's small and quick to install)
+   - Firmware that supports PortMaster
+   - Retro Handheld with working Internet connection (obviously not all handhelds are supported, see list of tested handhelds below)
+        - Caveat: you CAN manually install Pocket Curator without an Internet connection - just copy the release .zip file to your ports folder and unzip it
+   - At least one other Port installed (often the Ports system won't show up on the systems carousel until you have an official PortMaster port installed, I recommend 2048. It's small and quick to install)
    - aarch64 libraries (don't worry, you probably won't know if you have these or not)
 
 ## Tested Handhelds (working!)
@@ -88,15 +85,15 @@ Anbernic:
    - RG 35xx SP
    - RG 40xx H & V
    - RG 552
-   - BatleXP G350 (You will need a wifi dongle for the first run!)
+   - BatleXP G350 (You will need a wifi dongle for installation!)
 
 Powkiddy:
    - RGB10 MAX3
    - RGB20 Pro
    - RGB30
-   - V10 (You will need a wifi dongle for the first run!)
-   - V90S (You will need a wifi dongle for the first run!)
-   - X35H (You will need a wifi dongle for the first run!)
+   - V10 (You will need a wifi dongle for installation!)
+   - V90S (You will need a wifi dongle for installation!)
+   - X35H (You will need a wifi dongle for installation!)
    - X55
 
 TrimUI:
@@ -106,75 +103,26 @@ TrimUI:
    - Smart Pro S
 
 Misc:
-   - R36S (You will need a wifi dongle for the first run!)
-   - R36H (You will need a wifi dongle for the first run!)
-   - Kinhank K36 (You will need a wifi dongle for the first run!)
+   - R36S (You will need a wifi dongle for installation!)
+   - R36H (You will need a wifi dongle for installation!)
+   - Kinhank K36 (You will need a wifi dongle for installation!)
 
-I see no reason Pocket Curator would NOT work on any handheld that is supported by Rocknix or Knulli, so long as it uses the libs.aarch64 libraries and you can get the device on WiFi for the first run of Pocket Curator. After the first run, Pocket Curator operates without need for WiFi, a PC, or for you to remove your SD card.
+I see no reason Pocket Curator would NOT work on any handheld that is supported by Rocknix or Knulli, so long as it uses the libs.aarch64 libraries and you can get the device connected to the Internet for the installation, it should work just fine. After installation, Pocket Curator operates without need for an Internet connection, a PC, or for you to remove your SD card. **You DO need sn Internet connection for the update checker / update installer.**
 
-## Quick Install Instructions for Nerds Who Know What They're Doing
+## Quick Install Instructions
 
  1) Boot up your handheld and make sure you have:
      - up to date firmware
      - up to date PortMaster
-     - at least ONE Port installed with PortMaster (or Ports won't show as a system in Rocknix)
-     - a good WiFi connection to the Internet for your handheld
- 2) Download the most recent release zip file from the link to the right
- 3) Copy this zip file to your handheld's roms/ports folder (make sure you pick the right one, it can vary depending on if your ROMs are on the 'internal' sd card or the 'external' sd card). There's plenty of ways to do this. Feel free to use the samba connection, SSH, SCP, HTTP, or the old classic: remove the sd card and copy the file from your PC.
- 4) SSH to the handheld and unzip the release zip file. It will create a pocketcurator folder (where all the goodies are) and two .sh scripts: Pocket Curator.sh (this is the one you use to start Pocket Curator) and PocketCuratorMetadataInstall.sh (this is the one you use to populate the Emulation Station metadata for Pocket Curator). You can delete the zip file after you unzip it. NOTE: It is recommended to SSH to the device and unzip the file there instead of unziping it on your PC and copying the files. (the console command is 'unzip' followed by the filename, ex: unzip pocketcurator_port-v0.61.9.zip) I've had trouble with Windows corrupting the python with CR/LF in places that should only be LF characters. You've been warned!
- 5) On your handheld, go into the Emulation Station menu and refresh your games list (or reboot, or restart Emulation Station)
- 6) Now in the Ports games list, you'll see Pocket Curator and the PocketCuratorMetadataInstall scripts as games. Start the PocketCuratorMetadataInstall one and give it a few seconds. You will see a message about it updating, then Emulation Station will refresh the gameslist. There may be a second or two pause between the message and ES refresh. Don't panic. ;) After the refresh, you can delete PocketCuratorMetadataInstall from your Ports games list (use the ES menu like you would normally)
- 7) Now you're ready to start Pocket Curator. When you start it the first time it will stay on a blank screen for several seconds. This is normal. Don't panic! Pocket Curator is downloading resources via PortMaster (which is why it needs wifi for the first run).
- 8) Then it will show the Pocket Curator splash screen. It will stay here for a few seconds as it scans your ROM collection. Depending on the size of your collection, it may take longer. When it's done, you're taken to a system selection carousel that should look very familiar.
- 9) Use the typical dpad directions and buttons to navigate, just like in Emulation Station.
- 10) When you exit, if you deleted any games, it will have Emulation Station refresh the games list.
-     
-## Installation for the Rest of Us
+     - at least ONE Port installed with PortMaster (or Ports won't show as a system in some firmwares)
+     - a good connection to the Internet for your handheld (WiFi or even via USB tethering)
+ 2) Download the PocketCurator.Installer.sh from most recent release page. https://github.com/tomtombombadil/PocketCurator/releases
+ 3) Copy PocketCurator.Installer.sh to the ports folder on your SD card. (You can do this via SSH, SCP, SAMBA, or simply remove the SD card and put it in your PC)
+ 4) From the Main Menu in Emulation Station, select GAME SETTINGS and UPDATE GAMESLISTS. This will refresh the list of your games, and make PocketCurator.Installer appear on your list of Ports.
+ 5) Go into the Ports system in Emulation Station, and highlight PocketCurator.Installer and press A to run it.
+ 6) PortMaster will show some installation messages and install the latest release of Pocket Curator. When it finishes, Emulation Station will refresh your gameslist again.
 
-Pocket Curator is **not** in the PortMaster store, so it's installed manually — a one-time copy. After the install and first run everything happens on the device. I hope to implement a built-in updater so that Pocket Curator can update itself from this repository. Obviously that would require a wifi connection.
-
-   **Install instructions are still being written and tested!**
-   **THANK YOU FOR YOUR PATIENCE!**
-
-Multiple installation methods, depending on what you have at your disposal:
-
-Method #1 - The SD Card Shuffle (we used to call it SneakerNet!)
-   - Remove SD card and put in a PC with Internet
-   - Download the Pocket Curator release zip file, unzip it to your roms/ports folder
-   - Put SD card back in the handheld, make sure the handheld has a WiFi connection
-   - Run Pocket Curator for the first time.
-   - Don't panic! Pocket Curator will sit at a blank screen for a few moments the first time it runs. It has to download a couple resources via PortMaster.
-   - After a few moments, you'll see the Pocket Curator splash screen.
-   - It will scan your gameslists, then take you to a system selection carousel.
-
-Method #2 - The USB Stick Shuffle
-   - Download the Pocket Curator release zip file onto either your PC or your Android phone or tablet. Even a Chromebook will work. (iPhone might work I'm not sure)
-   - Unzip the Pocket Curator on your PC/phone/tablet and copy the files to your USB stick.
-   - Plug your USB stick into your handheld.
-   - Use the built-in filemanager in the Tools section of your handheld to copy the files from your USB stick to your roms/ports folder.
-   - Go to the Emulation Station menu and refresh your games list.
-   - Pocket Curator will show up on your games list under the Ports system.
-   - Run Pocket Curator. The first time you run it, you'll need a wifi and Internet connection so Pocket Curator can download some resources through PortMaster. It will sit at a blank screen for a few moments while it downloads.
-   - Don't panic! The Pocket Curator splash screen will appear next while it scans your games lists. Then you'll be taken to a systems carousel, very similar to Emulation Station.
-
-Method #3 - Geek-tastic Way! (SSH and SAMBA and CLI, oh my!)
-   - Download the Pocket Curator release zip file on your PC.
-   - Make sure your handheld is on and connected to your WiFi.
-   - Make a note of your handheld's IP address in the Network Settings menu.
-   - Make sure your handheld has SSH and SAMBA enabled in the settings.
-   - On Windows, open a new File Explorer window and type \\ followed by your handheld's IP address. This will open the Samba share that is your handheld. Open the folders there, finding roms/ports folder.
-   - Drag and drop the Pocket Curator zip file to the roms/ports folder.
-   - Open an SSH client on your PC. (I prefer PuTTY!)
-   - Connect to your handheld's IP address via SSH.
-   - Login with your firmware's username and password. (Rocknix default is root and rocknix. Knulli default is root and linux.)
-   - Change directory to the roms/ports folder. (This location will vary depending on whether you have one sd card or two and if you're running Rocknix or Knulli)
-   - You'll see the Pocket Curator zip file there. Unzip it with this command:
-            unzip pocketcurator_port-v0.61.9.zip <--- make sure to use the exact filename shown
-                                                      in the directory. It includes the version.
-   - Delete the zip file after it is done unzipping (rm pocketcurator_port-v0.61.9.zip)
-   - Exit your SSH session. Close your file explorer window.
-   - On your handheld, go to the Emulation Station Main Menu and select: **Game Settings > Update Gameslist** to refresh your handheld's games lists. The scroll through your systems to Ports, scroll down to Pocket Curator and select it to run it.
-   - The first time it runs, it will sit at a blank screen for a long moment. Don't panic! Pocket Curator is downloading resources via PortMaster so that it can run. This only happens on the first run of Pocket Curator, and you do not need WiFi after this to use Pocket Curator (and it won't take that long to load next time either!)
+That's it! Easy peasy lemon squeezy. ;)
 
 ## Controls
 
@@ -199,35 +147,25 @@ Method #3 - Geek-tastic Way! (SSH and SAMBA and CLI, oh my!)
 ## Settings
 
 Pressing Select will take you to the Pocket Curator Settings screen. These settings are available:
+   - Update Pocket Curator - if you're connected to the Internet and your clock is set properly, it will check this GitHub repo for the latest version and install it for you
    - Font Size - changes the size of the font in Pocket Curator.
    - Auto-scroll description - enabling this will cause the game descriptions on the games list to scroll automatically up and down
    - Safe Mode - enabling this will cause Pocket Curator to NOT delete anything! You can use this to test it out without fear.
    - Delete Scraped Media - this is enabled by default, turning it off will cause Pocket Curator to ONLY delete the game ROM/ZIP file. It will NOT delete the scraped files for that game.
    - Rating Display - two options here Text & Stars. It controls which appears in games list display for the rating of the game: stars or a number.
+   - About Pocket Curator - shows some status information about what Pocket Curator knows about your handheld
 
-The Settings screen also shows the running version of Pocket Curator (top right), the detected firmware (Rocknix, Knulli, etc.), the detected location/path to your games (ex: /storage/roms), the detected theme you're using with Emulation Station, a line of help text for the selected setting, and a line of help text for controls.
+The Settings screen also shows a line of help text for the selected setting, and a line of help text for controls.
 
 Settings persist in `pocketcurator/settings.json`.
 
 ## System Logos
 
-Pocket Curator ships **no** logos of its own; it reads them from your installed themes the way EmulationStation does (at least MOST of the time!) If Pocket Curator can't find your theme's system logos it will fall back to the Rocknix/Knulli defaults. Pocket Curator also tries to determine your region so it can give you the correct system logos (for example: SNES for North America, and Super Famicom for Japan)
+Pocket Curator ships **no** system logos of its own; it reads them from your installed themes the way EmulationStation does (at least MOST of the time!) If Pocket Curator can't find your theme's system logos it will fall back to the Rocknix/Knulli defaults. Pocket Curator also tries to determine your region so it can give you the correct system logos (for example: SNES for North America, and Super Famicom for Japan)
 
-## Pocket Curator's Own Image & Description in Emulation Station
-
-Out of the box, EmulationStation lists Pocket Curator without any metadata. <sad trombone noise> And typing in your own metadata (description, screenshot, splash screen, etc) is a real bummer. <another sad trombone noise> But fear not intrepid gamer! Pocket Curator has you covered. It has it's own **PocketCuratorMetadataInstall** script. You'll see it as another port in the Ports games list. Simply start it (press A) and it will update Pocket Curator's metadata with all the goodies (description, rating, genre, screenshots, etc.) then it will automagically tell Emulation Station to refresh the games list, cementing that metadata in place. After that, you can delete the **PocketCuratorMetadataInstall** entry in your games list using the boring old Emulation Station menu. 
-
-   ## Nerd Knowledge (Geeky Things You Might Wonder About)
-   
-   - Why a separate metadata installer? EmulationStation rewrites each gamelist from memory whenever you return from a "game" (a port counts as a game), so metadata written while a port runs gets overwritten. The only moment a write survives is when ES is idle at its menu, so the installer schedules the write and an in-place gamelist reload to run a few seconds after it exits.
-   - A fresh log is written to `pocketcurator/pocketcurator.log` each launch.
-   - **`xkbcommon ... Compose ... UTF-8` lines in the log file** are harmless input-teardown noise, unrelated to Pocket Curator.
-   
 ## Troubleshooting
 
-- **First launch errors about a runtime/download** — needs Wi-Fi once; get
-  online and relaunch.
-- **No Screenshot or Video in the Games List** — run `PocketCuratorMetadataInstall` once and let it do it's thing, populating the metadata for Pocket Curator for you.
+- **First launch errors about a runtime/download** — needs an Internet connection once; get your device connected and relaunch.
 
 ## Building / packaging
 
