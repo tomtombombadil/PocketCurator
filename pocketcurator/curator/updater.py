@@ -128,17 +128,37 @@ class Updater:
         self.error = ""
         self._spawn(self._download_worker)
 
+    def start_full(self) -> None:
+        """Check, and if an update exists, download + verify + stage it
+        in one motion - no second confirmation. This is what the update
+        dialog runs; the whole pipeline logs as it goes."""
+        if self.busy() or self.state == STAGED:
+            return
+        self.state = CHECKING
+        self.error = ""
+        self._spawn(self._full_worker)
+
+    def _full_worker(self) -> None:
+        self._check_worker()
+        if self.state == AVAILABLE:
+            self.state = DOWNLOADING
+            self.progress = 0.0
+            self._download_worker()
+
+    def _say(self, msg: str) -> None:
+        print(f"[updater] {msg}")
+
     def status_text(self) -> str:
         """One-liner for the settings row's value column."""
         return {
             IDLE: "",
             CHECKING: "Checking...",
             UP_TO_DATE: "Up to date",
-            AVAILABLE: f"v{self.latest_version} found - A: get it",
+            AVAILABLE: f"v{self.latest_version} found",
             DOWNLOADING: f"Downloading {int(self.progress * 100)}%",
             VERIFYING: "Verifying...",
             STAGING: "Preparing...",
-            STAGED: f"v{self.latest_version} ready",
+            STAGED: f"v{self.latest_version} ready - restart to apply",
             ERROR: "Failed - A: retry",
         }.get(self.state, "?")
 
@@ -169,6 +189,7 @@ class Updater:
 
     def _check_worker(self) -> None:
         try:
+            self._say(f"checking for update (current v{self.current_version})...")
             if not shutil.which("curl"):
                 raise UpdateError("curl not found on this firmware.")
             data = self._fetch_json(API_LATEST)
@@ -184,9 +205,12 @@ class Updater:
             if not tag or not zip_asset:
                 raise UpdateError("Release found but no port zip attached.")
             if _version_tuple(tag) <= _version_tuple(self.current_version):
+                self._say(f"up to date (latest release is {tag})")
                 self.state = UP_TO_DATE
                 return
             self.latest_version = tag.lstrip("vV")
+            self._say(f"update found: {tag} "
+                      f"({int(zip_asset.get('size', 0) or 0) // 1024} KB)")
             self._asset_url = zip_asset.get("browser_download_url", "")
             self._asset_size = int(zip_asset.get("size", 0) or 0)
             self._sha_url = (sha_asset or {}).get("browser_download_url", "")
@@ -208,10 +232,13 @@ class Updater:
             shutil.rmtree(self.update_dir, ignore_errors=True)
             self.update_dir.mkdir(parents=True, exist_ok=True)
 
+            self._say(f"downloading v{self.latest_version} from {self._asset_url}")
             self._download(self._asset_url, zip_path, self._asset_size)
+            self._say("download complete; verifying...")
 
             self.state = VERIFYING
             self._verify(zip_path)
+            self._say("verified; staging into .update/staged")
 
             self.state = STAGING
             staged = self.update_dir / "staged"
@@ -231,6 +258,8 @@ class Updater:
             (self.update_dir / "READY").write_text(
                 self.latest_version, encoding="utf-8")
             self.state = STAGED
+            self._say(f"v{self.latest_version} staged - the launcher "
+                      f"applies it at the start of the next launch")
         except UpdateError as exc:
             shutil.rmtree(self.update_dir, ignore_errors=True)
             self._fail(str(exc))

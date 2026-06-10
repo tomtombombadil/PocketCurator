@@ -48,7 +48,7 @@ class StatusScreen:
             self.app.updater = Updater(self.app.port_dir, __version__)
         u = self.app.updater
         if u.state == "staged":
-            self._latest = f"v{u.latest_version} downloaded, installs next launch"
+            self._latest = f"v{u.latest_version} ready - restart to apply"
             return
         if not u.busy():
             u.start_check()
@@ -58,13 +58,13 @@ class StatusScreen:
                 break
             pygame.time.wait(250)
         if u.state == "available":
-            self._latest = f"v{u.latest_version} available - see Check For Updates"
+            self._latest = f"v{u.latest_version} available"
         elif u.state == "up_to_date":
-            self._latest = "This is the latest version"
+            self._latest = "latest version"
         elif u.state == "staged":
-            self._latest = f"v{u.latest_version} downloaded, installs next launch"
+            self._latest = f"v{u.latest_version} ready - restart to apply"
         else:
-            self._latest = "Couldn't check (see Check For Updates)"
+            self._latest = "couldn't check"
 
     # ------------------------------------------------------------------
 
@@ -136,19 +136,29 @@ class StatusScreen:
         for lbl, val in rows:
             lab = body_font.render(lbl + ":", True, muted)
             surface.blit(lab, (box.x + pad, y))
-            val_s = self._fit(body_font, str(val), max_val_w)
-            vs = body_font.render(val_s, True, text)
-            surface.blit(vs, (box.x + pad + label_w, y))
-            y += line_h
+            for part in self._wrap(body_font, str(val), max_val_w):
+                vs = body_font.render(part, True, text)
+                surface.blit(vs, (box.x + pad + label_w, y))
+                y += line_h
 
         hint = small_font.render("Press A or B to close.", True, muted)
         surface.blit(hint, (box.x + pad, box.bottom - hint.get_height() - pad))
 
     @staticmethod
-    def _fit(font, s: str, max_w: int) -> str:
-        """Middle-ellipsize long values (paths) to the panel width."""
-        if font.size(s)[0] <= max_w:
-            return s
-        while len(s) > 8 and font.size("..." + s[-(len(s) - 4):])[0] > max_w:
-            s = s[1:]
-        return "..." + s[-(len(s) - 4):] if len(s) > 8 else s
+    def _wrap(font, s: str, max_w: int):
+        """Word-wrap a row value to the panel width; over-long single
+        tokens (paths) are middle-ellipsized so nothing overflows."""
+        out, line = [], ""
+        for word in s.split(" "):
+            while font.size(word)[0] > max_w and len(word) > 8:
+                word = "..." + word[5:]
+            cand = (line + " " + word).strip()
+            if font.size(cand)[0] <= max_w:
+                line = cand
+            else:
+                if line:
+                    out.append(line)
+                line = word
+        if line:
+            out.append(line)
+        return out or [""]

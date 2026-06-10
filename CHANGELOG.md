@@ -2,6 +2,34 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.62.2] - 2026-06-10
+
+### Update flow
+- "Check For Updates" now opens a Software Update dialog that runs the
+  whole pipeline unattended - no second confirmation between "found"
+  and "download". Progress reads as a checklist: Checking for update...
+  / Update found: vX / Downloading update... NN% / Verifying update... /
+  Update ready! Restart Pocket Curator to complete the update. Closing
+  the dialog mid-download is safe; the download continues and the
+  Settings row reflects it.
+- The updater now logs every step (check, found+size, download URL,
+  verify, staged) so the launcher log answers "what did the update do"
+  by itself.
+
+### Startup timing instrumentation
+- Always-on [timing] log marks across startup: settings/db load, display
+  init, theme resolution, and the ROM scan (with system and ROM counts).
+  Investigation of the reported slow splash on a large library points at
+  the discovery ROM walk - which v0.62.x never touched - but the next
+  slow-splash log will now say definitively which phase ate the time,
+  and how it scales with library size.
+
+### Status dialog
+- Row values now word-wrap to the panel width (over-long single tokens
+  like paths are middle-ellipsized), fixing the Version line overflow.
+  Latest-version wording shortened to wrap cleanly.
+
+
 ## [0.62.1] - 2026-06-10
 
 ### Settings

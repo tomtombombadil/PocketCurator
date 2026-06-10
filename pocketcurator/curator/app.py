@@ -33,6 +33,19 @@ class App:
         print(f"[app] Pocket Curator v{__version__} build {__build__}")
         print(f"[app] port_dir={port_dir}")
 
+        # Startup phase timing. Cheap, always on: when someone reports a
+        # slow splash, the log should answer "slow doing WHAT" without a
+        # special build.
+        import time as _time
+        self._t0 = _time.monotonic()
+        self._t_last = self._t0
+        def _mark(label: str) -> None:
+            now = _time.monotonic()
+            print(f"[timing] {label}: +{now - self._t_last:.2f}s "
+                  f"(total {now - self._t0:.2f}s)")
+            self._t_last = now
+        self._mark = _mark
+
         self.port_dir = port_dir
         self.package_dir = port_dir / "curator"
         self.assets_dir = port_dir / "assets"
@@ -40,6 +53,7 @@ class App:
 
         self.config = self._load_settings()
         self.systems_db = load_systems_db(self.package_dir)
+        self._mark("settings + systems db loaded")
 
         self.firmware_name = detect_firmware_name()
         roms_dir = detect_roms_dir(self.config.get("roms_dir_override"))
@@ -70,6 +84,7 @@ class App:
         else:
             flags = 0
         self.surface = pygame.display.set_mode((self.screen_w, self.screen_h), flags)
+        self._mark("display ready")
         pygame.display.set_caption("Pocket Curator")
         pygame.mouse.set_visible(False)
         self.clock = pygame.time.Clock()
@@ -134,6 +149,7 @@ class App:
 
         # Theme region / subset selections, for themes that ship region
         # logo variants (e.g. US TurboGrafx-16 vs PC Engine). Detected once.
+        self._mark("theme resolved")
         try:
             self.artwork_region, self.theme_subsets = detect_artwork_region()
             print(f"[app] artwork region: {self.artwork_region or 'unset'}")
@@ -217,10 +233,14 @@ class App:
         # the user sees something other than a black screen and doesn't
         # think the app has hung.
         self._show_splash("Scanning ROM folders, please wait...")
+        self._mark("init complete, ROM scan starting")
 
         systems = discover_systems(self.roms_dir, self.systems_db)
+        self._mark(f"ROM scan done ({len(systems)} systems, "
+                   f"{sum(s.get('rom_count', 0) for s in systems)} ROMs)")
         from .ui.system_browser import SystemBrowserScreen
         self._screens.append(SystemBrowserScreen(self, systems))
+        self._mark("system browser built - startup finished")
 
     def _draw_startup_splash(self) -> None:
         """Called once from __init__, the moment we have a display and a

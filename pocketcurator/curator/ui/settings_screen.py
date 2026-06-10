@@ -35,8 +35,8 @@ def _make_options():
             # reflects live updater state rather than a settings value.
             "status": lambda app: _updater(app).status_text(),
             "dynamic_hint": lambda app: _updater(app).hint_text(),
-            "run": lambda app: _updater_action(app),
-            "hint": "Checks GitHub for a new release. Needs WiFi.",
+            "run": lambda app: _open_update(app),
+            "hint": "Checks for and downloads new releases. Needs WiFi.",
         },
         {
             "label": "Status",
@@ -95,17 +95,12 @@ def _updater(app):
     return app.updater
 
 
-def _updater_action(app):
-    """A-press behavior depends on state: check when idle/failed/up to
-    date (a re-check is always harmless), download when one is found,
-    nothing while busy or staged."""
-    u = _updater(app)
-    if u.busy() or u.state == "staged":
-        return
-    if u.state == "available":
-        u.start_download()
-    else:
-        u.start_check()
+def _open_update(app):
+    """The row opens the update dialog, which runs the whole pipeline
+    (check -> download -> verify -> stage) without further input."""
+    _updater(app)  # ensure the shared instance exists
+    from .update_screen import UpdateScreen
+    app.push_screen(UpdateScreen(app))
 
 
 class SettingsScreen:
