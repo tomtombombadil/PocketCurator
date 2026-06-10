@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.62.2
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.62.3
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -161,6 +161,23 @@ cd "$GAMEDIR" || exit 1
 # Fresh log every launch.
 > "$GAMEDIR/pocketcurator.log" && exec > >(tee "$GAMEDIR/pocketcurator.log") 2>&1
 
+# Launcher-phase timing. $SECONDS counts from shell start, so these
+# lines bracket everything the in-app [timing] marks can't see: the
+# update apply, runtime mount, python boots, and SDL probing. A slow
+# first launch should now be attributable from the log alone.
+pc_stage() { echo "[Pocket Curator +${SECONDS}s] $1"; }
+pc_stage "launcher log started"
+if [ -n "$PC_UPDATE_JUST_APPLIED" ]; then
+  pc_stage "an update was applied at the start of this launch (see update.log)"
+fi
+
+# The one-file installer leaves its log in the ports root, where the
+# user trips over it. Adopt it into our folder on first launch.
+if [ -f "$SCRIPT_DIR/pocketcurator_install.log" ]; then
+  mv -f "$SCRIPT_DIR/pocketcurator_install.log" "$GAMEDIR/install.log" 2>/dev/null \
+    && pc_stage "moved installer log into pocketcurator/install.log"
+fi
+
 APP_VERSION=$(grep '^__version__' "$GAMEDIR/curator/__init__.py" | sed -E 's/.*"([^"]+)".*/\1/')
 APP_BUILD=$(grep '^__build__'   "$GAMEDIR/curator/__init__.py" | sed -E 's/.*"([^"]+)".*/\1/')
 
@@ -215,6 +232,7 @@ else
 fi
 
 if [ "$USE_SYSTEM_PYTHON" = "0" ]; then
+  pc_stage "runtime ready"
   echo "[Pocket Curator] using bundled Pyxel runtime"
   runtime="pyxel_2.2.8_python_3.11"
   runtime_file="$controlfolder/libs/${runtime}.squashfs"
@@ -300,6 +318,7 @@ echo "[Pocket Curator] python prefix = $($PYTHON_BIN -c 'import sys; print(sys.p
 echo "[Pocket Curator] python stdlib found: $($PYTHON_BIN -c 'import os; print(True)' 2>/dev/null)"
 
 echo "[Pocket Curator] testing pygame import..."
+pc_stage "python boot + pygame import test starting (first run after an update recompiles bytecode here)"
 if ! "$PYTHON_BIN" -c "import pygame; print('[Pocket Curator] pygame', pygame.version.ver, 'loaded OK')"; then
   pm_message "Pocket Curator: pygame failed to import. Check pocketcurator.log."
   sleep 10
@@ -403,6 +422,7 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
       echo "[Pocket Curator] WARNING: only dummy (headless) driver works - no visible display."
     fi
   fi
+  pc_stage "display probe complete"
   echo "[Pocket Curator] ==== probe complete: driver='${WORKING_DRIVER:-NONE}' env='${WORKING_ENV:-none}' ===="
   if [ -z "$WORKING_DRIVER" ]; then
     pm_message "Pocket Curator: no SDL video driver worked. Check pocketcurator.log."
@@ -418,7 +438,8 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   if [ -n "$WORKING_ENV" ]; then
     export $WORKING_ENV
   fi
-  echo "[Pocket Curator] running with SDL_VIDEODRIVER=$SDL_VIDEODRIVER extra_env='${WORKING_ENV:-none}'"
+  pc_stage "launching the app"
+echo "[Pocket Curator] running with SDL_VIDEODRIVER=$SDL_VIDEODRIVER extra_env='${WORKING_ENV:-none}'"
 fi
 
 # Dismiss the PortMaster loading dialog and signal that we're ready to
@@ -649,6 +670,7 @@ refresh_emulationstation() {
 # Run the app.
 "$PYTHON_BIN" -u "$GAMEDIR/main.py"
 APP_EXIT=$?
+pc_stage "app exited"
 echo "[Pocket Curator] python exited with $APP_EXIT"
 
 # Cleanup. Use pkill -f (like PortMaster) so we also catch gptokeyb2

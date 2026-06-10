@@ -2,6 +2,34 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.62.3] - 2026-06-10
+
+### First-launch performance (slow-splash follow-up)
+- Investigation of the ~2-minute first launch on a large library: the
+  v0.62.2 timing marks show the in-app startup took 4.0s on that very
+  launch (29 systems / 17,381 ROMs scanned in 3.75s, gamelist-only) -
+  the wait lived in the launcher phase, which uniquely runs the update
+  apply (18 MB copy to SD), cold bytecode compilation, and three cold
+  Python boots on a first launch of a new version. Discovery was
+  verified gamelist-only (no folder crawl, no per-entry stat), and the
+  only gamelist.xml writer in the codebase remains Pocket Curator's own
+  metadata entry - deletions are pure file unlinks; ES owns all other
+  gamelist edits.
+- Releases now ship precompiled Python bytecode (3.11, hash-based
+  unchecked invalidation, valid regardless of extraction timestamps),
+  removing the recompile cost from first launches entirely.
+- Launcher log lines now carry elapsed-time stamps
+  ("[Pocket Curator +12s] ...") at each phase: log start, update
+  applied, runtime ready, python boot/pygame import, display probe,
+  app launch, app exit - so a slow first launch is attributable from
+  the log alone.
+
+### Housekeeping
+- The one-file installer's log no longer lingers in the ports root: the
+  installer moves it into pocketcurator/install.log when it finishes,
+  and the launcher adopts any stray copy from older installs on launch.
+
+
 ## [0.62.2] - 2026-06-10
 
 ### Update flow

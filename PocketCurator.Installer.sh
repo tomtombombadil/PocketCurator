@@ -159,6 +159,11 @@ elif [ -f "$PORTS_DIR/PocketCuratorMetadataInstall.sh" ]; then
   PC_SKIP_PMFINISH=1 /bin/bash "$PORTS_DIR/PocketCuratorMetadataInstall.sh" >> "$LOGF" 2>&1
 fi
 
+# Our log started in the ports root before pocketcurator/ existed;
+# now that it does, keep the ports folder clean and move it home.
+if [ -d "$GAMEDIR" ]; then
+  mv -f "$LOGF" "$GAMEDIR/install.log" 2>/dev/null && LOGF="$GAMEDIR/install.log"
+fi
 say "done! Pocket Curator $tag will appear in Ports momentarily."
 pm_message "Pocket Curator $tag installed! You can delete the installer, or keep it for repairs."
 sleep 6
