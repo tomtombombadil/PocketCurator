@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.63.0
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.63.1
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -317,6 +317,26 @@ echo "[Pocket Curator] XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-(unset)}"
 echo "[Pocket Curator] python prefix = $($PYTHON_BIN -c 'import sys; print(sys.prefix)' 2>/dev/null)"
 echo "[Pocket Curator] python stdlib found: $($PYTHON_BIN -c 'import os; print(True)' 2>/dev/null)"
 
+# Display-probe cache: once a driver combo works on this firmware +
+# device, remember it and try it first next launch - and skip the
+# standalone pygame import test, since the cached probe's preflight
+# proves the same thing with one less Python boot (~3-6s on slow SD).
+PC_PROBE_CACHE="$GAMEDIR/conf/display_probe.cache"
+PC_PROBE_KEY="${CFW_NAME}|${DEVICE_NAME:-?}"
+PC_CACHED_LINE=""
+if [ -f "$PC_PROBE_CACHE" ]; then
+  cached="$(cat "$PC_PROBE_CACHE" 2>/dev/null)"
+  if [ "${cached%%::*}" = "$PC_PROBE_KEY" ]; then
+    PC_CACHED_LINE="${cached#*::}"
+    echo "[Pocket Curator] probe cache hit for $PC_PROBE_KEY: $PC_CACHED_LINE"
+  else
+    echo "[Pocket Curator] probe cache is for different hardware; ignoring"
+  fi
+fi
+
+if [ -n "$PC_CACHED_LINE" ] && [ "$USE_SYSTEM_PYTHON" != "1" ]; then
+  echo "[Pocket Curator] skipping pygame import test (cached probe will verify the runtime)"
+elif true; then
 echo "[Pocket Curator] testing pygame import..."
 pc_stage "python boot + pygame import test starting (first run after an update recompiles bytecode here)"
 if ! "$PYTHON_BIN" -c "import pygame; print('[Pocket Curator] pygame', pygame.version.ver, 'loaded OK')"; then
@@ -327,6 +347,7 @@ if ! "$PYTHON_BIN" -c "import pygame; print('[Pocket Curator] pygame', pygame.ve
   fi
   pm_finish
   exit 1
+fi
 fi
 
 # Gamepad -> keyboard mapping. Knulli/Batocera use the opposite A/B
@@ -363,6 +384,17 @@ echo "[Pocket Curator] --- end controller diag ---"
 $GPTOKEYB "python3" -c "$GPTK_FILE" &
 GPTK_PID=$!
 
+# Release the display BEFORE probing. On AmberELEC (and any firmware
+# whose ES holds DRM master while a port launches), probing kmsdrm with
+# ES still owning the display fails every real driver and the old code
+# fell through to a headless dummy run - a black screen with the app
+# invisibly alive (RG552, v0.62.2/v0.63.0). The release used to happen
+# after the probes; that ordering was lost in a launcher reconstruction.
+if type pm_platform_helper >/dev/null 2>&1; then
+  echo "[Pocket Curator] calling pm_platform_helper to release display (pre-probe)"
+  pm_platform_helper
+fi
+
 # SDL driver probe for bundled-Pyxel path.
 if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   echo "[Pocket Curator] ==== probing SDL2 video drivers ===="
@@ -378,13 +410,16 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   if [ -z "$SYS_SDL2" ]; then
     echo "[Pocket Curator] no system libSDL2 found; will only try bundled SDL"
   fi
-  # Probe order (v0.61.10): wayland first so ROCKNIX stays on its fast path,
-  # then for kmsdrm/x11 try the BUNDLED SDL before the system-SDL preload.
-  # AmberELEC's system SDL (2.26.2) is older than the bundled pygame's SDL
-  # (2.28.4), so preloading it is rejected as a version downgrade - bundled
-  # kmsdrm is what works there. On dArkOS the opposite holds (system SDL
-  # 2.32.10 is newer and carries the platform's display support), so the
-  # +sysSDL fallbacks remain right after each bundled attempt.
+  # Probe order, two principles:
+  #   1. The firmware name tells us what almost certainly works - try
+  #      that FIRST instead of marching through the whole ladder:
+  #        ROCKNIX -> wayland; dArkOS -> kmsdrm+sysSDL (system SDL
+  #        2.32.10 carries the platform display support); AmberELEC ->
+  #        bundled kmsdrm (its system SDL 2.26.2 is a version downgrade
+  #        vs bundled 2.28.4 and gets rejected on preload).
+  #   2. A cached previous success (this firmware + device) outranks
+  #      even the firmware default, and is attempted before anything.
+  # The full ladder remains behind both as the safety net.
   probe_attempts=(
     "wayland|wayland|"
     "wayland+sysSDL|wayland|LD_PRELOAD=$SYS_SDL2"
@@ -393,9 +428,28 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
     "x11|x11|"
     "x11+sysSDL|x11|LD_PRELOAD=$SYS_SDL2"
   )
+  case "${CFW_NAME,,}" in
+    rocknix|jelos)
+      preferred="wayland|wayland|" ;;
+    darkos|arkos)
+      preferred="kmsdrm+sysSDL|kmsdrm|LD_PRELOAD=$SYS_SDL2" ;;
+    amberelec)
+      preferred="kmsdrm|kmsdrm|" ;;
+    *)
+      preferred="" ;;
+  esac
+  if [ -n "$preferred" ]; then
+    probe_attempts=("$preferred" "${probe_attempts[@]}")
+  fi
+  if [ -n "$PC_CACHED_LINE" ]; then
+    probe_attempts=("$PC_CACHED_LINE" "${probe_attempts[@]}")
+  fi
   WORKING_DRIVER=""
   WORKING_ENV=""
+  tried=""
   for attempt in "${probe_attempts[@]}"; do
+    case "$tried" in *"|$attempt|"*) continue ;; esac
+    tried="$tried|$attempt|"
     IFS='|' read -r label drv envkv <<< "$attempt"
     if [ -n "$envkv" ] && [[ "$envkv" == *"="* ]]; then
       envval="${envkv#*=}"
@@ -410,22 +464,20 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
     if [ "$rc" = "0" ]; then
       WORKING_DRIVER="$drv"
       WORKING_ENV="$envkv"
+      mkdir -p "$GAMEDIR/conf" 2>/dev/null
+      printf '%s::%s\n' "$PC_PROBE_KEY" "$attempt" > "$PC_PROBE_CACHE" 2>/dev/null \
+        && echo "[Pocket Curator] cached working probe '$label' for $PC_PROBE_KEY"
       break
     fi
   done
-  if [ -z "$WORKING_DRIVER" ]; then
-    echo "[Pocket Curator] -- no real driver worked; probing dummy --"
-    SDL_VIDEODRIVER=dummy "$PYTHON_BIN" -u "$GAMEDIR/preflight.py"
-    if [ "$?" = "0" ]; then
-      WORKING_DRIVER="dummy"
-      WORKING_ENV=""
-      echo "[Pocket Curator] WARNING: only dummy (headless) driver works - no visible display."
-    fi
-  fi
+  # No dummy fallback anymore. A headless run is a black screen with an
+  # invisible app eating input (RG552 ran 72s like that) - strictly
+  # worse than telling the user and returning to ES.
   pc_stage "display probe complete"
   echo "[Pocket Curator] ==== probe complete: driver='${WORKING_DRIVER:-NONE}' env='${WORKING_ENV:-none}' ===="
   if [ -z "$WORKING_DRIVER" ]; then
-    pm_message "Pocket Curator: no SDL video driver worked. Check pocketcurator.log."
+    rm -f "$PC_PROBE_CACHE" 2>/dev/null
+    pm_message "Pocket Curator: no working display driver on this firmware. Returning to EmulationStation. (Details in pocketcurator.log)"
     sleep 10
     kill -9 "$GPTK_PID" 2>/dev/null || true
     if [[ "$PM_CAN_MOUNT" != "N" ]]; then
@@ -450,11 +502,6 @@ fi
 # because multiple Wayland clients can coexist, but calling it is still
 # the correct thing to do. Other firmwares may not define the function
 # at all, so we type-check first.
-if type pm_platform_helper >/dev/null 2>&1; then
-  echo "[Pocket Curator] calling pm_platform_helper to release display"
-  pm_platform_helper
-fi
-
 # Restart EmulationStation so it re-reads gamelist.xml from disk. ES
 # Refresh EmulationStation so it reflects our gamelist changes (deleted
 # games dropped; our Ports metadata shown).
@@ -743,8 +790,17 @@ if [ -f "$GAMEDIR/.es_refresh_needed" ]; then
       esac
       echo "[Pocket Curator] refresh reason='$refresh_reason'"
       echo "[Pocket Curator] $refresh_msg"
-      pm_message "$refresh_msg"
-      refresh_emulationstation "$refresh_reason"
+      # The in-place API reload is sub-second and invisible - putting a
+      # pm_message before it made every exit pay harbourmaster's slow
+      # Python boot just to flash a message about work already done.
+      # Message only when we actually fall back to a restart.
+      if _pc_reload_via_api; then
+        echo "[Pocket Curator] refreshed EmulationStation in place (reloadgames API)"
+      else
+        echo "[Pocket Curator] reloadgames API unavailable; using restart fallback"
+        pm_message "$refresh_msg"
+        _pc_fallback_restart "$refresh_reason"
+      fi
       ;;
   esac
 fi

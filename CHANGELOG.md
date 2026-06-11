@@ -2,6 +2,72 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.63.1] - 2026-06-11
+
+Field-test fixes for the WebDAV fetch feature plus two launcher-level
+display fixes, from R36S/dArkOS, Smart Pro S/Knulli, RG552/AmberELEC,
+and RG35xxSP/ROCKNIX logs.
+
+### Crash fix: Y press on dArkOS and ROCKNIX
+- webdav.py imported `ssl` at module load; the bundled runtime on
+  dArkOS/ROCKNIX lacks libssl.so.1.1, so pressing Y crashed the whole
+  app with ImportError. ssl is now imported lazily and only for
+  https:// URLs (with a clear "use http:// instead" message when the
+  runtime can't do HTTPS), and the Y handler is guarded so no import
+  failure can ever crash the app again.
+
+### The folder decides the destination
+- Copies now target the device system matching the remote folder
+  you're browsing (amiga folder -> the handheld's amiga folder), not
+  the system you launched from - fixing the bug where an atari2600
+  ROM copied from the atari2600 folder landed in gba/. The extension
+  filter follows the same mapping, so browsing other systems' folders
+  shows their games instead of "nothing here matches". Folders that
+  match no system on the device are browseable but copying is blocked
+  with a clear message. (The mis-filed ROM appearing in the GBA list
+  was ES scanning the file we put in the wrong place - nothing ever
+  wrote to a gamelist.xml; deleting the stray file fully cleans it.)
+- Navigation is now an explicit path stack: B always goes exactly one
+  level back, and only backing out of the top listing leaves the
+  browser - no more surprise disconnect to the server picker.
+
+### Remote browser parity with the deletion screens
+- Layout, fonts, and screenshot sizing now mirror the game list
+  exactly (same list width, same image area at 70% of the panel, same
+  description font); Y jumps to a letter and Select opens Settings,
+  same as there.
+- Listings load in a background thread with a readable "Opening
+  connection..." / "Loading folder..." state; a slow server can no
+  longer freeze the UI.
+- While copying, the legend shows only "Copying 4/10: Title" over a
+  thicker progress bar measuring the WHOLE queue in bytes - no
+  per-file counters - and when the queue finishes the normal help
+  text simply returns (no completion banner).
+
+### Display: firmware-aware probing, cache, and no more headless runs
+- The display is released (pm_platform_helper) BEFORE probing. On
+  AmberELEC, ES still held DRM master during the probes, so every
+  real driver failed and v0.62.x ran headless on a black screen -
+  this ordering was the missing piece of the original v0.61.10 fix.
+- The firmware name now picks the first probe (ROCKNIX->wayland,
+  dArkOS->kmsdrm+system SDL, AmberELEC->bundled kmsdrm), and the
+  winning probe is cached per firmware+device and tried first on
+  every later launch - dArkOS launches skip four failed probes
+  (~10s), and a cache hit also skips the standalone pygame import
+  test (one fewer Python boot).
+- If no real driver works, Pocket Curator now tells the user and
+  returns to EmulationStation instead of running invisibly on the
+  dummy driver.
+
+### Exit speed
+- The instant in-place ES reload (API) now runs first and silently;
+  the "Refreshing your games list..." message - whose harbourmaster
+  boot was most of the slow exit on ROCKNIX - only appears when the
+  slow restart fallback is actually needed.
+
+### Carousel
+- The legend now shows "Y WebDAV".
+
 ## [0.63.0] - 2026-06-11
 
 ### Fetch from WebDAV (new feature)

@@ -26,9 +26,15 @@ from __future__ import annotations
 import html.parser
 import http.client
 import posixpath
-import ssl
 import time
 import urllib.parse
+
+# ssl is intentionally NOT imported at module level: the bundled Pyxel
+# runtime on dArkOS/ROCKNIX lacks libssl.so.1.1, so `import ssl` raises
+# ImportError there - which, when done at import time, crashed the whole
+# app the moment Y was pressed (v0.63.0 on R36S/RG35xxSP). HTTPS is
+# optional for LAN fetching; we import ssl only when an https:// URL
+# actually needs it and degrade with a clear message when it's absent.
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -92,6 +98,12 @@ class DavClient:
 
     def _conn(self) -> http.client.HTTPConnection:
         if self._https:
+            try:
+                import ssl
+            except ImportError:
+                raise DavError(
+                    "HTTPS isn't available on this firmware's runtime - "
+                    "use an http:// address instead.")
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE   # see module docstring

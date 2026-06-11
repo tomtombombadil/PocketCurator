@@ -53,20 +53,25 @@ class QueueSnapshot:
     job_title: str = ""
     file_done: int = 0          # bytes of the current FILE
     file_total: int = 0
-    job_files_done: int = 0     # files completed within the job
-    job_files_total: int = 0
+    queue_bytes_done: int = 0   # bytes finished across the WHOLE queue
+    queue_bytes_total: int = 0  # bytes of everything ever enqueued
     completed: int = 0
     failed: List[str] = field(default_factory=list)
     error: str = ""
 
     def legend_text(self) -> str:
-        """One line for the help-bar slot while copying."""
+        """One line above the progress bar: the queue position and the
+        game's title. A game and its scrapings are one unit; no
+        per-file noise."""
         if not self.active:
             return ""
-        pct = (int(self.file_done * 100 / self.file_total)
-               if self.file_total else 0)
         return (f"Copying {self.job_index}/{self.job_count}: "
-                f"{self.job_title}  {pct}%")
+                f"{self.job_title}")
+
+    def queue_fraction(self) -> float:
+        if self.queue_bytes_total <= 0:
+            return 0.0
+        return min(1.0, self.queue_bytes_done / self.queue_bytes_total)
 
 
 class FetchQueue:
@@ -95,6 +100,8 @@ class FetchQueue:
                         f"{free // (1024*1024)} MB.")
             self._jobs.extend(jobs)
             self._snap.job_count += len(jobs)
+            self._snap.queue_bytes_total += sum(j.total_bytes()
+                                                for j in jobs)
             self._snap.active = True
             if self._thread is None or not self._thread.is_alive():
                 self._cancel = False
@@ -115,8 +122,8 @@ class FetchQueue:
                 active=s.active, job_index=s.job_index,
                 job_count=s.job_count, job_title=s.job_title,
                 file_done=s.file_done, file_total=s.file_total,
-                job_files_done=s.job_files_done,
-                job_files_total=s.job_files_total,
+                queue_bytes_done=s.queue_bytes_done + s.file_done,
+                queue_bytes_total=s.queue_bytes_total,
                 completed=s.completed, failed=list(s.failed),
                 error=s.error)
 
@@ -133,23 +140,19 @@ class FetchQueue:
                 job = self._jobs.pop(0)
                 self._snap.job_index += 1
                 self._snap.job_title = job.title
-                self._snap.job_files_total = 1 + len(job.media)
-                self._snap.job_files_done = 0
                 self._snap.error = ""
 
             try:
                 self._copy_one(job.rom_href,
                                self.dest_dir / job.rom_name, job.rom_size)
-                self._bump_file()
                 for m in job.media:
                     dest = self.dest_dir / m.rel_dest
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     self._copy_one(m.href, dest, m.size)
-                    self._bump_file()
                 with self._lock:
                     self._snap.completed += 1
                 print(f"[fetch] copied '{job.title}' "
-                      f"({self._snap.job_files_total} files)")
+                      f"({1 + len(job.media)} files)")
             except DavError as exc:
                 with self._lock:
                     self._snap.failed.append(job.title)
@@ -170,7 +173,8 @@ class FetchQueue:
         self.client.download(href, dest, size,
                              on_progress=on_progress,
                              cancelled=lambda: self._cancel)
-
-    def _bump_file(self) -> None:
+        # File finished: fold its bytes into the whole-queue figure.
         with self._lock:
-            self._snap.job_files_done += 1
+            self._snap.queue_bytes_done += (self._snap.file_total or size)
+            self._snap.file_done = 0
+            self._snap.file_total = 0

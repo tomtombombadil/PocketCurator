@@ -60,10 +60,16 @@ class SystemBrowserScreen:
         elif event.key == pygame.K_y:
             # Fetch from WebDAV into the highlighted system - the
             # destination is decided by what's under the cursor, so the
-            # flow never has to ask where files are going.
+            # flow never has to ask where files are going. Guarded so a
+            # missing runtime piece degrades to a log line, never a
+            # crash (v0.63.0's ssl ImportError took down the whole app).
             if self.systems:
-                from .remote_flow import start_fetch
-                start_fetch(self.app, self.systems[self.selected])
+                try:
+                    from .remote_flow import start_fetch
+                    start_fetch(self.app, self.systems[self.selected],
+                                self.systems)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[fetch] feature unavailable: {exc}")
         elif event.key == pygame.K_ESCAPE:
             from .exit_prompt import ExitPromptScreen
             self.app.push_screen(ExitPromptScreen(self.app))
@@ -300,6 +306,7 @@ class SystemBrowserScreen:
             "Choose system",
             sep + "A Enter",
             sep + "X Delete system",
+            sep + "Y WebDAV",
             sep + "Sel Settings",
             sep + "B Exit",
         ]

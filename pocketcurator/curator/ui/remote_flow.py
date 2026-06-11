@@ -32,13 +32,16 @@ from ..webdav import DavAuthRequired, DavClient, DavError, Source
 from .. import netscan
 
 
-def start_fetch(app, system: dict) -> None:
-    """Entry point. Called by the system carousel's Y handler."""
+def start_fetch(app, system: dict, systems=None) -> None:
+    """Entry point. Called by the system carousel's Y handler. `system`
+    is the highlighted system (smart-jump target); `systems` is the
+    whole device list, which the browser uses to map remote folders to
+    local destinations."""
     saved = _load_sources(app)
     if saved:
-        app.push_screen(SourcePickerScreen(app, system, saved))
+        app.push_screen(SourcePickerScreen(app, system, saved, systems))
     else:
-        app.push_screen(FindNewScreen(app, system))
+        app.push_screen(FindNewScreen(app, system, systems))
 
 
 # ----------------------------------------------------------------------
@@ -165,42 +168,48 @@ class _MenuScreen:
 # ----------------------------------------------------------------------
 
 class SourcePickerScreen(_MenuScreen):
-    def __init__(self, app, system: dict, saved: List[Source]):
+    def __init__(self, app, system: dict, saved: List[Source],
+                 systems=None):
         super().__init__(app, f"Fetch into {system['display']} - from where?")
         self.system = system
+        self.systems = systems
         self.saved = saved
         self.items = [s.display() for s in saved] + ["Find New WebDAV Server"]
 
     def _activate(self, index: int) -> None:
         if index >= len(self.saved):
-            self.app.push_screen(FindNewScreen(self.app, self.system))
+            self.app.push_screen(
+                FindNewScreen(self.app, self.system, self.systems))
             return
         src = self.saved[index]
         pw_cache = getattr(self.app, "_dav_passwords", {})
         src.password = pw_cache.get(src.url, "")
-        _connect_and_open(self.app, self.system, src, self)
+        _connect_and_open(self.app, self.system, src, self, self.systems)
 
 
 class FindNewScreen(_MenuScreen):
-    def __init__(self, app, system: dict):
+    def __init__(self, app, system: dict, systems=None):
         super().__init__(app, "Find New WebDAV Server")
         self.system = system
+        self.systems = systems
         self.items = ["Scan the local network", "Enter an address"]
 
     def _activate(self, index: int) -> None:
         if index == 0:
-            self.app.push_screen(ScanScreen(self.app, self.system))
+            self.app.push_screen(
+                ScanScreen(self.app, self.system, self.systems))
         else:
-            _prompt_address(self.app, self.system, self)
+            _prompt_address(self.app, self.system, self, self.systems)
 
 
 class ScanScreen(_MenuScreen):
     """Runs the subnet scan in a thread; morphs into the results list."""
 
-    def __init__(self, app, system: dict):
+    def __init__(self, app, system: dict, systems=None):
         super().__init__(app, "Scanning the local network...",
                          footer="B cancel")
         self.system = system
+        self.systems = systems
         self.results: List[netscan.Found] = []
         self.done = False
         self._cancelled = False
@@ -228,9 +237,10 @@ class ScanScreen(_MenuScreen):
         if self.results and index < len(self.results):
             f = self.results[index]
             _connect_and_open(self.app, self.system,
-                              Source(url=f.url, dialect=f.dialect), self)
+                              Source(url=f.url, dialect=f.dialect), self,
+                              self.systems)
         elif self.items[index].startswith("Enter"):
-            _prompt_address(self.app, self.system, self)
+            _prompt_address(self.app, self.system, self, self.systems)
         else:
             self.app.pop_screen()
 
@@ -258,31 +268,35 @@ class ScanScreen(_MenuScreen):
 # Connect / auth plumbing
 # ----------------------------------------------------------------------
 
-def _prompt_address(app, system: dict, parent) -> None:
+def _prompt_address(app, system: dict, parent, systems=None) -> None:
     from .osk import OSKScreen
 
     def got(text: Optional[str]) -> None:
         if not text:
             return
-        _connect_and_open(app, system, Source(url=text.strip()), parent)
+        _connect_and_open(app, system, Source(url=text.strip()), parent,
+                          systems)
 
     app.push_screen(OSKScreen(
         app, "Server address (e.g. 192.168.1.20:5005)", got,
         layout="keypad"))
 
 
-def _connect_and_open(app, system: dict, src: Source, parent) -> None:
+def _connect_and_open(app, system: dict, src: Source, parent,
+                      systems=None) -> None:
     """Probe in a thread, prompting for credentials on 401, then open
-    the remote browser. `parent` shows transient status text."""
+    the remote browser. `parent` shows status while connecting; the
+    browser itself then shows "Opening connection..." until the first
+    listing is on screen, so the state is readable end to end."""
 
     def attempt() -> None:
-        parent.status = f"Connecting to {src.url}..."
+        parent.status = f"Opening connection to {src.url}..."
         try:
             client = DavClient(src)
             client.probe()
         except DavAuthRequired:
             parent.status = ""
-            _prompt_credentials(app, system, src, parent)
+            _prompt_credentials(app, system, src, parent, systems)
             return
         except DavError as exc:
             parent.status = str(exc)
@@ -290,12 +304,13 @@ def _connect_and_open(app, system: dict, src: Source, parent) -> None:
         parent.status = ""
         remember_source(app, src)
         from .remote_browser import RemoteBrowserScreen
-        app.push_screen(RemoteBrowserScreen(app, system, client))
+        app.push_screen(RemoteBrowserScreen(app, system, client, systems))
 
     threading.Thread(target=attempt, daemon=True).start()
 
 
-def _prompt_credentials(app, system: dict, src: Source, parent) -> None:
+def _prompt_credentials(app, system: dict, src: Source, parent,
+                        systems=None) -> None:
     from .osk import OSKScreen
 
     def got_user(user: Optional[str]) -> None:
@@ -307,7 +322,7 @@ def _prompt_credentials(app, system: dict, src: Source, parent) -> None:
             if pw is None:
                 return
             src.password = pw
-            _connect_and_open(app, system, src, parent)
+            _connect_and_open(app, system, src, parent, systems)
 
         app.push_screen(OSKScreen(
             app, f"Password for {src.username or 'this server'}",
