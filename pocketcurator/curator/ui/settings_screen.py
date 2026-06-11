@@ -46,6 +46,14 @@ def _make_options():
             "hint": "Version, firmware, paths, theme, and connection health.",
         },
         {
+            "label": "Restore Gamelist Backup",
+            "kind": "action",
+            "status": lambda app: "",
+            "run": lambda app: _open_restore(app),
+            "hint": ("Puts back a system's gamelist.xml from the backup "
+                     "made before Fetch injected game details."),
+        },
+        {
             "label": "Font Size",
             "kind": "int_range",
             "min": 14, "max": 80, "step": 2,
@@ -234,3 +242,50 @@ class SettingsScreen:
 def _open_status(app):
     from .status_screen import StatusScreen
     app.push_screen(StatusScreen(app))
+
+
+def _open_restore(app):
+    """List systems with gamelist backups; A restores the newest."""
+    from ..gamelist_merge import list_backups, restore_backup
+    from .remote_flow import _MenuScreen, NoticeScreen
+
+    backups = list_backups(app.port_dir)
+    if not backups:
+        app.push_screen(NoticeScreen(
+            app, "No backups yet",
+            "Backups are made automatically the first time Fetch "
+            "injects game details into a system's gamelist.xml."))
+        return
+
+    class _RestoreScreen(_MenuScreen):
+        def __init__(self, app):
+            super().__init__(app, "Restore which gamelist?")
+            self.backups = backups
+            self.items = [f"{b['shortname']}  (backup from {b['stamp']})"
+                          for b in backups]
+            self.status = ("Restoring replaces the system's current "
+                           "gamelist.xml with the backup.")
+
+        def _activate(self, index):
+            b = self.backups[index]
+            system = None
+            for s in getattr(app, "all_systems", []) or []:
+                if s["shortname"] == b["shortname"]:
+                    system = s
+                    break
+            if system is None:
+                # fall back: derive the dir from any loaded system list
+                from pathlib import Path
+                roms_root = Path(app.roms_dir)
+                system = {"path": str(roms_root / b["shortname"])}
+            ok = restore_backup(system["path"], b["path"])
+            self.app.pop_screen()
+            self.app.push_screen(NoticeScreen(
+                app,
+                "Restored" if ok else "Restore failed",
+                (f"{b['shortname']}'s gamelist.xml was restored from "
+                 f"the {b['stamp']} backup."
+                 if ok else
+                 "Couldn't write the gamelist. Check pocketcurator.log.")))
+
+    app.push_screen(_RestoreScreen(app))

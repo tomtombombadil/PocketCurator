@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.63.2
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.64.0
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -445,16 +445,23 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   # SDL (2.26.2) is rejected as a downgrade - a PortMaster SDL is the
   # remaining path to a real display there.
   pm_sdl_count=0
-  for pmsdl in "$controlfolder"/libs/libSDL2-2.0.so* \
-               "$controlfolder"/libs."$DEVICE_ARCH"/libSDL2-2.0.so* \
-               /roms/ports/PortMaster/libs/libSDL2-2.0.so* \
-               /opt/system/Tools/PortMaster/libs/libSDL2-2.0.so*; do
+  for pmsdl in $(find "$controlfolder" /roms/ports/PortMaster \
+                      /opt/system/Tools/PortMaster \
+                      -maxdepth 4 -name 'libSDL2-2.0.so*' -type f \
+                      2>/dev/null | sort -u); do
     [ -f "$pmsdl" ] || continue
     [ "$pmsdl" = "$SYS_SDL2" ] && continue
     pm_sdl_count=$((pm_sdl_count + 1))
     echo "[Pocket Curator] PortMaster SDL found: $pmsdl (probe candidate)"
     probe_attempts+=("kmsdrm+pmSDL${pm_sdl_count}|kmsdrm|LD_PRELOAD=$pmsdl")
   done
+  # The Pyxel runtime ships its OWN pygame, built by PortMaster for
+  # these devices - and we normally shadow it with our bundled copy via
+  # PYTHONPATH. Where our bundled pygame's SDL lacks kmsdrm (AmberELEC),
+  # the runtime's own build may have it: probe with our libs.aarch64
+  # dropped from PYTHONPATH so the runtime pygame loads instead.
+  probe_attempts+=("kmsdrm+runtimePygame|kmsdrm|PYTHONPATH=$GAMEDIR")
+  probe_attempts+=("x11+runtimePygame|x11|PYTHONPATH=$GAMEDIR")
   if [ -n "$preferred" ]; then
     probe_attempts=("$preferred" "${probe_attempts[@]}")
   fi

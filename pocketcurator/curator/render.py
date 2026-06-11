@@ -296,16 +296,22 @@ def _draw_one_star(surface: pygame.Surface,
         surface.set_clip(prev_clip)
 
 
+HEADER_DELETE_BG = (178, 34, 34)    # white-on-red: destructive mode
+HEADER_FETCH_BG = (24, 100, 52)     # white-on-dark-green: acquisitive mode
+
+
 def draw_screen_header(surface: pygame.Surface, app, theme, ui,
-                       text: str) -> int:
-    """Title strip across the top of full-screen lists ("MARK FOR
-    DELETE" / "FETCH FROM WebDAV") so visually similar screens are
+                       text: str, bg) -> int:
+    """Large, centered, color-coded title strip across the top of the
+    full-screen lists - MARK FOR DELETE (white on red) and FETCH FROM
+    WebDAV (white on dark green) - so the look-alike screens are
     instantly tellable apart. Returns the strip height so callers can
     shift their panels down by it."""
-    font = app.fonts.get(max(11, int(ui["font_size_base"] * 0.7)))
-    h = font.get_linesize() + 6
+    font = app.fonts.get(max(14, int(ui["font_size_base"] * 0.95)))
+    h = font.get_linesize() + 8
     rect = pygame.Rect(0, 0, surface.get_width(), h)
-    pygame.draw.rect(surface, tuple(theme["legend_bg_color"]), rect)
-    label = font.render(text, True, tuple(theme["legend_text_color"]))
-    surface.blit(label, (10, rect.y + (h - label.get_height()) // 2))
+    pygame.draw.rect(surface, bg, rect)
+    label = font.render(text, True, (255, 255, 255))
+    surface.blit(label, ((rect.w - label.get_width()) // 2,
+                         rect.y + (h - label.get_height()) // 2))
     return h

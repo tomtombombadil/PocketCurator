@@ -46,7 +46,56 @@ from ..webdav import DavClient, DavError, RemoteEntry, format_size
 from ..render import (draw_stars, draw_wrapped_text, render_clipped_text,
                       wrap_text)
 
-FETCH_GREEN = (64, 224, 96)   # marked-for-fetch: the inverse mood of
+FETCH_GREEN = (64, 224, 96)
+EXISTS_YELLOW = (235, 200, 50)  # marked but already on the device
+
+# Folder-name translation layer: firmwares disagree about what some
+# system folders are called (ROCKNIX/Knulli use Batocera-style names,
+# ArkOS-family and AmberELEC use 351elec/RetroPie-style). Every name in
+# a group resolves to whichever of them exists on THIS device, both for
+# mapping a remote folder to a local destination and for the smart-jump
+# search. Groups are bidirectional.
+ALIAS_GROUPS = [
+    {"megadrive", "genesis", "md"},
+    {"segacd", "megacd"},
+    {"pcengine", "tg16", "turbografx16", "pce"},
+    {"pcenginecd", "tg16cd", "tgcd"},
+    {"supergrafx", "sgfx"},
+    {"gb", "gameboy"},
+    {"gbc", "gameboycolor"},
+    {"gba", "gameboyadvance"},
+    {"nes", "famicom", "fc"},
+    {"snes", "sfc", "superfamicom", "supernintendo"},
+    {"n64", "nintendo64"},
+    {"lynx", "atarilynx"},
+    {"ngp", "ngpx", "neogeopocket"},
+    {"ngpc", "neogeopocketcolor"},
+    {"psx", "ps1", "playstation"},
+    {"mastersystem", "ms", "sms"},
+    {"gamegear", "gg"},
+    {"colecovision", "coleco"},
+    {"intellivision", "intv"},
+    {"arcade", "mame"},
+    {"fbneo", "fba", "fbn"},
+    {"amstradcpc", "cpc"},
+    {"atarist", "st"},
+    {"dreamcast", "dc"},
+    {"saturn", "segasaturn"},
+    {"wonderswan", "wswan"},
+    {"wonderswancolor", "wswanc"},
+    {"virtualboy", "vb"},
+    {"odyssey2", "videopac", "o2em"},
+]
+_ALIASES = {}
+for _grp in ALIAS_GROUPS:
+    for _n in _grp:
+        _ALIASES[_n] = _grp
+
+
+def expand_names(name: str):
+    """name + every alias of it, lowercased."""
+    n = name.lower()
+    return _ALIASES.get(n, {n}) | {n}   # marked-for-fetch: the inverse mood of
                               # deletion's red X - bright green plus
 
 MEDIA_DIRS = ("images", "videos", "manuals", "media", "downloaded_images")
@@ -86,6 +135,7 @@ class RemoteBrowserScreen:
         self.selected = 0
         self.scroll = 0
         self.flagged: Set[int] = set()
+        self.flagged_existing: Set[int] = set()   # marked AND on device
         self.error = ""
         self.toast = ""
         self._toast_until = 0
@@ -110,12 +160,16 @@ class RemoteBrowserScreen:
     # ------------------------------------------------------------------
 
     def _system_lookup(self) -> Dict[str, dict]:
+        """Every name a device system answers to - shortname, its roms
+        folder's leaf, and all aliases of both - maps to that system."""
         out: Dict[str, dict] = {}
         for s in self.all_systems:
-            out[s["shortname"].lower()] = s
-            leaf = Path(str(s.get("path", ""))).name.lower()
+            names = set(expand_names(s["shortname"]))
+            leaf = Path(str(s.get("path", ""))).name
             if leaf:
-                out.setdefault(leaf, s)
+                names |= expand_names(leaf)
+            for n in names:
+                out.setdefault(n, s)
         return out
 
     def _context_for(self, href: str) -> Optional[dict]:
@@ -170,6 +224,7 @@ class RemoteBrowserScreen:
             self.selected = 0
             self.scroll = 0
             self.flagged.clear()
+            self.flagged_existing.clear()
             self._preview_for = -1
             self._preview_img_for = -1
             self._preview_img = None
@@ -181,10 +236,10 @@ class RemoteBrowserScreen:
                       ) -> Optional[str]:
         """Initial-open helper: walk toward the folder named after the
         LAUNCH system, following one level of 'roms/' indirection."""
-        wanted = {self.launch_system["shortname"].lower()}
-        leaf = Path(str(self.launch_system.get("path", ""))).name.lower()
+        wanted = set(expand_names(self.launch_system["shortname"]))
+        leaf = Path(str(self.launch_system.get("path", ""))).name
         if leaf:
-            wanted.add(leaf)
+            wanted |= expand_names(leaf)
         dirs = {e.name.lower(): e for e in entries if e.is_dir}
         for w in wanted:
             if w in dirs:
@@ -297,6 +352,11 @@ class RemoteBrowserScreen:
     # Queue
     # ------------------------------------------------------------------
 
+    def _exists_locally(self, e: RemoteEntry) -> bool:
+        ctx = self.context
+        return (ctx is not None
+                and (Path(ctx["path"]) / e.name).exists())
+
     def _toastline(self, msg: str, ms: int = 4000) -> None:
         self.toast = msg
         self._toast_until = pygame.time.get_ticks() + ms
@@ -314,8 +374,25 @@ class RemoteBrowserScreen:
             self._toastline("Finish the current copies first.")
             return
         if q is None or q.dest_dir != dest:
-            q = FetchQueue(self.client, dest)
+            q = FetchQueue(self.client, dest,
+                           on_job_done=self._merge_job_metadata)
             self.app.fetch_queue = q
+        # Copy w/ Scrapings + metadata injection: back the gamelist up
+        # once per system per session, BEFORE the first merge can touch
+        # it. (Restorable via Settings -> Restore Gamelist Backup.)
+        if with_media:
+            key = ctx["shortname"]
+            done = getattr(self.app, "_gl_backed_up", None)
+            if done is None:
+                done = set()
+                self.app._gl_backed_up = done
+            if key not in done:
+                from ..gamelist_merge import backup_gamelist
+                backup_gamelist(self.app.port_dir, ctx)
+                done.add(key)
+        self._merge_overwrite = not skip_existing
+        self._merge_system_dir = dest
+        gl = self._gamelist_for_cwd() if with_media else None
         jobs: List[FetchJob] = []
         skipped = 0
         for i in sorted(self.flagged):
@@ -324,11 +401,17 @@ class RemoteBrowserScreen:
                 skipped += 1
                 continue
             media = self._media_for(e) if with_media else []
+            entry_xml = None
+            if gl is not None:
+                g = gl.entry(e.name)
+                if g is not None:
+                    entry_xml = ET.tostring(g, encoding="unicode")
             jobs.append(FetchJob(title=Path(e.name).stem, rom_href=e.href,
                                  rom_name=e.name, rom_size=e.size,
-                                 media=media))
+                                 media=media, gamelist_entry=entry_xml))
         if not jobs:
             self.flagged.clear()
+            self.flagged_existing.clear()
             self._toastline("All of those are already on this handheld - "
                             "nothing to copy.")
             return
@@ -339,6 +422,7 @@ class RemoteBrowserScreen:
             self.app.fetches_occurred = True
             self._copied_any = True
             self.flagged.clear()
+            self.flagged_existing.clear()
             note = (f"Queued {len(jobs)} "
                     f"game{'s' if len(jobs) != 1 else ''} "
                     f"for {ctx['display']}")
@@ -347,6 +431,19 @@ class RemoteBrowserScreen:
             elif with_media:
                 note += " with scrapings"
             self._toastline(note)
+
+    def _merge_job_metadata(self, job: FetchJob, success: bool) -> None:
+        """Queue callback (worker thread): after a game's files land,
+        inject its source gamelist entry into the destination
+        gamelist.xml. Failures log and never disturb the copy."""
+        if not success or not job.gamelist_entry:
+            return
+        try:
+            from ..gamelist_merge import merge_entries
+            merge_entries(self._merge_system_dir, [job.gamelist_entry],
+                          overwrite=getattr(self, "_merge_overwrite", False))
+        except Exception as exc:  # noqa: BLE001 - never break the copy
+            print(f"[gamelist-merge] skipped for '{job.title}': {exc}")
 
     # ------------------------------------------------------------------
     # Input
@@ -385,6 +482,8 @@ class RemoteBrowserScreen:
                 cur = self.entries[self.selected]
                 if self.selected != old_sel and not cur.is_dir:
                     self.flagged.add(self.selected)
+                    if self._exists_locally(cur):
+                        self.flagged_existing.add(self.selected)
             else:
                 self._activate()
         elif k == pygame.K_x:
@@ -427,8 +526,11 @@ class RemoteBrowserScreen:
         else:
             if self.selected in self.flagged:
                 self.flagged.discard(self.selected)
+                self.flagged_existing.discard(self.selected)
             else:
                 self.flagged.add(self.selected)
+                if self._exists_locally(e):
+                    self.flagged_existing.add(self.selected)
 
     def _go_back(self) -> None:
         """B: exactly one level back along the visited path; at the top
@@ -440,39 +542,33 @@ class RemoteBrowserScreen:
             return
         if self._copied_any:
             self._copied_any = False
-            from .remote_flow import _MenuScreen
+            from .remote_flow import NoticeScreen
 
-            class _ExitNotice(_MenuScreen):
-                def __init__(nself, app, browser):
-                    super().__init__(app,
-                                     "Your new games are copied",
-                                     footer="A OK")
-                    nself.browser = browser
-                    nself.items = ["OK"]
-                    nself.status = ("EmulationStation's games list will "
-                                    "show them after you exit "
-                                    "Pocket Curator.")
-
-                def _activate(nself, index):
-                    nself.app.pop_screen()      # this notice
-                    nself.app.pop_screen()      # the browser
-
-                def handle_event(nself, event):
-                    # B dismisses the same way - both leave the browser
-                    if (event.type == pygame.KEYDOWN
-                            and event.key == pygame.K_ESCAPE):
-                        nself._activate(0)
-                        return
-                    super().handle_event(event)
-
-            self.app.push_screen(_ExitNotice(self.app, self))
+            def leave():
+                self.app.pop_screen()           # the browser
+            self.app.push_screen(NoticeScreen(
+                self.app, "Heads up",
+                "The games you just copied are NOT in the games lists "
+                "yet - not in EmulationStation, and not in Pocket "
+                "Curator's delete lists either. They appear when the "
+                "games list refreshes, which happens when you exit "
+                "Pocket Curator.",
+                on_close=leave))
         else:
             self.app.pop_screen()
 
     def _confirm_copy(self) -> None:
         if self.context is None:
-            self._toastline("This handheld has no system matching "
-                            "this folder - can't copy here.")
+            from .remote_flow import NoticeScreen
+
+            def clear():
+                self.flagged.clear()
+                self.flagged_existing.clear()
+            self.app.push_screen(NoticeScreen(
+                self.app, "Can't copy here",
+                "Your device does not have a matching roms folder for "
+                "this game system. These files can't be copied.",
+                ok_label="A Cancel", on_close=clear))
             return
         if not self.flagged:
             self._toastline("Mark games with A first.", 3000)
@@ -557,9 +653,9 @@ class RemoteBrowserScreen:
 
         legend_h = max(28, base + 8)
         list_w = int(W * ui["list_width_pct"])
-        from ..render import draw_screen_header
+        from ..render import draw_screen_header, HEADER_FETCH_BG
         header_h = draw_screen_header(surface, self.app, theme, ui,
-                                      "FETCH FROM WebDAV")
+                                      "FETCH FROM WebDAV", HEADER_FETCH_BG)
         list_rect = pygame.Rect(0, header_h, list_w,
                                 H - legend_h - header_h)
         right_rect = pygame.Rect(list_w, header_h, W - list_w,
@@ -612,17 +708,22 @@ class RemoteBrowserScreen:
             e = self.entries[i]
             row = pygame.Rect(rect.x, y, rect.w, line_h)
             flagged = i in self.flagged
+            exists = i in self.flagged_existing
             if i == self.selected:
                 pygame.draw.rect(surface, hi, row)
-            # Marked-for-fetch rows go bright green (text and plus),
-            # the mirror image of deletion's red-X-and-grey.
+            # Marked rows: bright green plus for new games, yellow ?
+            # for games already on the device (decided at mark time).
             if flagged:
-                fg = FETCH_GREEN
+                fg = EXISTS_YELLOW if exists else FETCH_GREEN
             else:
                 fg = hi_text if i == self.selected else text_c
             x = row.x + 8
             if e.is_dir:
                 x += self._draw_folder_icon(surface, x, row, fg) + 8
+            elif flagged and exists:
+                qf = font.render("?", True, EXISTS_YELLOW)
+                surface.blit(qf, (x, row.y + 1))
+                x += qf.get_width() + 8
             elif flagged:
                 x += self._draw_plus(surface, x, row, FETCH_GREEN) + 8
             render_clipped_text(surface, e.name, font, fg,
@@ -713,6 +814,19 @@ class RemoteBrowserScreen:
                 s = meta_font.render(size_line, True, muted)
                 surface.blit(s, (x, y))
             y += meta_font.get_linesize() + 6
+            genre = (g.findtext("genre") or "").strip()
+            region = (g.findtext("region") or "").strip()
+            if not region:
+                import re as _re
+                m = _re.search(r"\(([^)]+)\)", e.name)
+                if m and len(m.group(1)) <= 24:
+                    region = m.group(1)
+            bits = "  \u2022  ".join(b for b in (region, genre) if b)
+            if bits:
+                render_clipped_text(surface, bits, meta_font, muted,
+                                    pygame.Rect(rect.x + pad, y, max_img_w,
+                                                meta_font.get_linesize()))
+                y += meta_font.get_linesize() + 6
             desc = (g.findtext("desc") or "").strip()
             if desc:
                 desc_font = self.app.fonts.get(max(12, int(base * 0.85)))

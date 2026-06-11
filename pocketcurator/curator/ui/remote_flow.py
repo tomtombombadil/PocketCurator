@@ -36,12 +36,11 @@ def start_fetch(app, system: dict, systems=None) -> None:
     """Entry point. Called by the system carousel's Y handler. `system`
     is the highlighted system (smart-jump target); `systems` is the
     whole device list, which the browser uses to map remote folders to
-    local destinations."""
-    saved = _load_sources(app)
-    if saved:
-        app.push_screen(SourcePickerScreen(app, system, saved, systems))
-    else:
-        app.push_screen(FindNewScreen(app, system, systems))
+    local destinations. The source picker is ALWAYS the entry screen,
+    with known servers at the top - so backing out of the browser
+    lands on a list that includes the server just used."""
+    app.push_screen(SourcePickerScreen(app, system,
+                                       _load_sources(app), systems))
 
 
 # ----------------------------------------------------------------------
@@ -163,23 +162,109 @@ class _MenuScreen:
                      (box.x + pad, box.bottom - pad - small.get_linesize()))
 
 
+class NoticeScreen:
+    """A modal notice done right: title, BODY TEXT AT FULL READING SIZE
+    (the message is the point), and a single OK bar pinned to the
+    bottom of the dialog. A and B both dismiss; on_close runs after."""
+
+    def __init__(self, app, title: str, body: str,
+                 ok_label: str = "OK", on_close=None):
+        self.app = app
+        self.title = title
+        self.body = body
+        self.ok_label = ok_label
+        self.on_close = on_close
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+            self.app.pop_screen()
+            if self.on_close is not None:
+                self.on_close()
+
+    def draw(self, surface: pygame.Surface) -> None:
+        below = self.app.screen_below(self)
+        if below is not None:
+            below.draw(surface)
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 200))
+        surface.blit(overlay, (0, 0))
+
+        from ..render import wrap_text
+        theme = self.app.config["theme"]
+        base = self.app.config["ui"]["font_size_base"]
+        text_c = tuple(theme["text_color"])
+        hi = tuple(theme["highlight_color"])
+        panel = tuple(theme["panel_bg_color"])
+
+        title_font = self.app.fonts.get(int(base * 1.1))
+        body_font = self.app.fonts.get(base)        # full reading size
+        pad = max(20, int(base * 0.9))
+        box_w = min(surface.get_width() - 60, max(640, base * 28))
+        lines = wrap_text(self.body, body_font, box_w - 2 * pad)
+        body_h = len(lines) * (body_font.get_linesize() + 4)
+        ok_h = body_font.get_linesize() + 16
+        box_h = min(surface.get_height() - 60,
+                    pad * 3 + title_font.get_linesize() + body_h + ok_h + 12)
+        box = pygame.Rect((surface.get_width() - box_w) // 2,
+                          (surface.get_height() - box_h) // 2, box_w, box_h)
+        pygame.draw.rect(surface, panel, box)
+        pygame.draw.rect(surface, hi, box, width=2)
+
+        y = box.y + pad
+        surface.blit(title_font.render(self.title, True, text_c),
+                     (box.x + pad, y))
+        y += title_font.get_linesize() + 10
+        for ln in lines:
+            surface.blit(body_font.render(ln, True, text_c),
+                         (box.x + pad, y))
+            y += body_font.get_linesize() + 4
+
+        # OK bar at the BOTTOM of the dialog
+        bar = pygame.Rect(box.x + pad, box.bottom - pad - ok_h,
+                          box.w - 2 * pad, ok_h)
+        pygame.draw.rect(surface, hi, bar)
+        lbl = body_font.render(self.ok_label, True, panel)
+        surface.blit(lbl, (bar.centerx - lbl.get_width() // 2,
+                           bar.centery - lbl.get_height() // 2))
+
+
 # ----------------------------------------------------------------------
 # Screens
 # ----------------------------------------------------------------------
 
 class SourcePickerScreen(_MenuScreen):
+    """Known servers at the top, then Scan / Enter. The item list is
+    rebuilt every frame from settings, so a server saved during this
+    visit appears the moment you're back on this screen."""
+
     def __init__(self, app, system: dict, saved: List[Source],
                  systems=None):
         super().__init__(app, f"Fetch into {system['display']} - from where?")
         self.system = system
         self.systems = systems
         self.saved = saved
-        self.items = [s.display() for s in saved] + ["Find New WebDAV Server"]
+        self._rebuild()
+
+    def _rebuild(self) -> None:
+        self.saved = _load_sources(self.app)
+        self.items = ([s.display() for s in self.saved]
+                      + ["Scan The Local Network", "Enter An Address"])
+        self.selected = min(self.selected, len(self.items) - 1) \
+            if self.items else 0
+
+    def draw(self, surface) -> None:
+        self._rebuild()
+        super().draw(surface)
 
     def _activate(self, index: int) -> None:
-        if index >= len(self.saved):
+        if index == len(self.saved):
             self.app.push_screen(
-                FindNewScreen(self.app, self.system, self.systems))
+                ScanScreen(self.app, self.system, self.systems))
+            return
+        if index == len(self.saved) + 1:
+            _prompt_address(self.app, self.system, self, self.systems)
             return
         src = self.saved[index]
         pw_cache = getattr(self.app, "_dav_passwords", {})

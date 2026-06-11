@@ -2,6 +2,76 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.64.0] - 2026-06-11
+
+### Gamelist metadata injection (new - the gamelist rule, amended)
+- Copy w/ Scrapings now also injects the fetched games' metadata
+  (name, description, image/video paths, rating, genre, region...)
+  into the destination system's gamelist.xml, so games arrive fully
+  described instead of waiting for a rescrape. This is the second
+  sanctioned gamelist writer (after our own Ports entry) and follows
+  the same proven machinery, under strict rules:
+  - BACKUP FIRST: before the first merge touches a system in a
+    session, its gamelist.xml is copied to
+    pocketcurator/backups/gamelists/ (three most recent kept), and a
+    new Settings -> Restore Gamelist Backup option puts one back.
+  - ORDERED INSERTION, never a blind append: new entries land
+    alphabetically by name among the existing entries; existing
+    entries and non-game blocks are not moved or modified.
+  - Overwrite replaces only that game's entry, in place; Skip leaves
+    the user's entry untouched. Source-history fields (playcount,
+    lastplayed, favorite) and unknown tags are dropped.
+  - Atomic temp+rename writes; any failure logs and never disturbs
+    the completed copy.
+
+### Mark-time existence + visuals
+- Whether a marked game already exists on the device is now checked
+  when you MARK it: already-present games get a yellow ? and yellow
+  text instead of the green plus, and the Overwrite/Skip question at
+  copy time lists how many are affected.
+
+### Dialogs and headers
+- Screen headers are now large, centered, and color-coded: MARK FOR
+  DELETE in white on red, FETCH FROM WebDAV in white on dark green.
+- New NoticeScreen: full-reading-size body text with the OK bar
+  pinned to the dialog bottom. The after-copy notice now says what it
+  means: the copied games are NOT in any games list yet - not ES, not
+  the delete lists - until the refresh on exit.
+- X with no matching destination now opens a proper dialog ("Your
+  device does not have a matching roms folder for this game system.
+  These files can't be copied." / A Cancel) and clears the marks on
+  dismissal, instead of a tiny legend toast.
+- The fetch right panel now shows region and genre (gamelist tags,
+  with the (USA)-style filename region as fallback).
+
+### Folder-name translation layer
+- Remote folders now map to local systems across firmware naming
+  conventions: megadrive<->genesis, pcengine<->tg16, nes<->famicom,
+  snes<->sfc, gb<->gameboy, lynx<->atarilynx, psx<->ps1,
+  segacd<->megacd, arcade<->mame, wswan<->wonderswan, and ~20 more
+  groups - applied to both destination mapping and smart-jump.
+
+### Fetch flow
+- The source picker is now always the entry screen, with known
+  servers at the top, then Scan The Local Network and Enter An
+  Address; the list rebuilds live, so a server you just used is on it
+  when you back out of the browser.
+
+### AmberELEC - the record, corrected
+- Transcript review shows the v0.61.13 release notes overstated
+  AmberELEC support: no log in the project's history shows a passing
+  display preflight on the RG552, and no test ever confirmed a
+  picture. The v0.61.10 probe-ordering change was a theory; v0.62.2+
+  logs disproved it (the bundled pygame SDL contains no kmsdrm
+  driver, and AmberELEC's system SDL 2.26.2 is a refused downgrade).
+- Two new probe candidates that could genuinely light it up: a
+  find-based scan for any PortMaster-shipped libSDL2 on the device
+  (the previous fixed paths found none), and - the promising one -
+  the Pyxel runtime's OWN pygame, which PortMaster builds per-device
+  and which our bundled copy normally shadows via PYTHONPATH. Two
+  ladder entries now probe kmsdrm/x11 with our libs dropped from
+  PYTHONPATH so the runtime's pygame loads instead.
+
 ## [0.63.2] - 2026-06-11
 
 Second field-test round (RG35xxSP, Smart Pro S, RG552).

@@ -40,6 +40,7 @@ class FetchJob:
     rom_name: str      # destination filename
     rom_size: int = 0
     media: List[MediaFile] = field(default_factory=list)
+    gamelist_entry: Optional[str] = None   # source <game> XML, if any
 
     def total_bytes(self) -> int:
         return self.rom_size + sum(m.size for m in self.media)
@@ -75,9 +76,11 @@ class QueueSnapshot:
 
 
 class FetchQueue:
-    def __init__(self, client: DavClient, dest_dir: Path):
+    def __init__(self, client: DavClient, dest_dir: Path,
+                 on_job_done=None):
         self.client = client
         self.dest_dir = Path(dest_dir)
+        self.on_job_done = on_job_done   # callback(job, success), worker thread
         self._jobs: List[FetchJob] = []
         self._lock = threading.Lock()
         self._snap = QueueSnapshot()
@@ -160,6 +163,11 @@ class FetchQueue:
                     self._snap.completed += 1
                 print(f"[fetch] copied '{job.title}' "
                       f"({1 + len(job.media)} files)")
+                if self.on_job_done is not None:
+                    try:
+                        self.on_job_done(job, True)
+                    except Exception as exc:  # noqa: BLE001
+                        print(f"[fetch] on_job_done error: {exc}")
             except DavError as exc:
                 with self._lock:
                     self._snap.failed.append(job.title)

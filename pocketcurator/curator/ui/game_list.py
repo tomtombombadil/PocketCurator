@@ -170,9 +170,9 @@ class GameListScreen:
         list_w = int(screen_w * ui["list_width_pct"])
         right_x = list_w
         right_w = screen_w - list_w
-        from ..render import draw_screen_header
+        from ..render import draw_screen_header, HEADER_DELETE_BG
         header_h = draw_screen_header(surface, self.app, theme, ui,
-                                      "MARK FOR DELETE")
+                                      "MARK FOR DELETE", HEADER_DELETE_BG)
 
         # Reset description scroll if the selection changed. Note we MUST
         # invalidate the cache_key here too - without that, the re-wrap
