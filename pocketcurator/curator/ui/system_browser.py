@@ -57,6 +57,13 @@ class SystemBrowserScreen:
             self._enter_selected()
         elif event.key == pygame.K_x:
             self._begin_delete_system()
+        elif event.key == pygame.K_y:
+            # Fetch from WebDAV into the highlighted system - the
+            # destination is decided by what's under the cursor, so the
+            # flow never has to ask where files are going.
+            if self.systems:
+                from .remote_flow import start_fetch
+                start_fetch(self.app, self.systems[self.selected])
         elif event.key == pygame.K_ESCAPE:
             from .exit_prompt import ExitPromptScreen
             self.app.push_screen(ExitPromptScreen(self.app))

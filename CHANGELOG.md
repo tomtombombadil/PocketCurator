@@ -2,6 +2,50 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.63.0] - 2026-06-11
+
+### Fetch from WebDAV (new feature)
+- Press Y on a system in the carousel to fetch ROMs into it from a
+  WebDAV or plain-HTTP server on the local network. The highlighted
+  system IS the destination - the flow never asks where files go.
+- Flow: saved sources (or straight to Find New when there are none) ->
+  scan the local /24 for servers / enter an address -> connect ->
+  remote browser. Servers requiring login prompt for username/password;
+  passwords are kept for the session only, never written to
+  settings.json.
+- Remote browser: smart-jumps to the folder named after the system
+  (gba for Game Boy Advance; one level of roms/ indirection followed),
+  falls back to the listing otherwise. Folders draw a folder glyph;
+  files filter to the system's extensions; A marks like the deletion
+  list; pausing on a game pulls description/rating/image from the
+  server's gamelist.xml. X opens the copy confirmation: Copy w/
+  Scrapings (default), Copy (ROMs only), Cancel.
+- Scrapings resolve from the remote gamelist.xml when present (exact
+  media paths) or by filename match under images/videos/manuals/media.
+- Copies run as a background queue: each file streams to .part and
+  renames on completion (cancel/power-cut safe, resumable), free space
+  is preflighted for the whole queue, and the legend bar shows
+  "Copying 4/10: <title> NN%" - a game and its scrapings count as one.
+  Fetched games trigger the normal ES refresh on exit.
+- Protocol layer is read-only by construction (only OPTIONS, PROPFIND,
+  HEAD, GET exist) and pure stdlib. WebDAV preferred, plain-HTTP
+  autoindex (python -m http.server, nginx) auto-detected as fallback.
+  Self-signed HTTPS accepted. Verified against live rclone and
+  python http.server instances, including auth, resume, and integrity.
+
+### On-screen keyboard (new component)
+- D-pad keyboard with two layouts (X toggles): a numeric keypad for
+  addresses with chord keys for '192.168.' '172.16.' '10.' and ports
+  ':5005' ':8080' ':80', and a full qwerty (Y cycles shift/symbols).
+  Masked entry for passwords. B backspaces, Start confirms.
+
+### Design deviations from the spec (flagged for review)
+- B remains "back" everywhere; the Scan/Enter and Copy confirmations
+  are d-pad+A option lists rather than binding actions to B, so a
+  reflexive B-press can never trigger a mass download.
+- The copy confirmation defaults its highlight to Copy w/ Scrapings.
+
+
 ## [0.62.3] - 2026-06-10
 
 ### First-launch performance (slow-splash follow-up)

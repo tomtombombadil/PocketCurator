@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.62.3
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.63.0
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================

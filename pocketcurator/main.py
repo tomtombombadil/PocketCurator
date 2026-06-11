@@ -51,7 +51,10 @@ def main() -> int:
     # only the deferred/ES-down write sticks.
     try:
         reason = ""
-        if bool(getattr(app, "deletions_occurred", False)):
+        if bool(getattr(app, "deletions_occurred", False)) \
+                or bool(getattr(app, "fetches_occurred", False)):
+            # Fetched games are new files ES hasn't seen; the same
+            # reload that surfaces deletions surfaces them.
             reason = "deletions"
         try:
             from curator.ports_gamelist import entry_needs_metadata

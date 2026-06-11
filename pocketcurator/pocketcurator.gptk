@@ -4,7 +4,7 @@
 #   A      -> Return     (flag toggle / confirm)
 #   B      -> Escape     (back / cancel / quit on the exit prompt)
 #   X      -> x          (delete: flagged games, or whole system on the carousel)
-#   Y      -> y          (jump-to-letter)
+#   Y      -> y          (game list: jump-to-letter; carousel: Fetch from WebDAV)
 #   L1     -> Page Up    (page up in game list)
 #   R1     -> Page Down  (page down in game list)
 #   L2     -> [          (description scroll up)
