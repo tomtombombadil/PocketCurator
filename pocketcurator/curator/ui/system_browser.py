@@ -295,56 +295,46 @@ class SystemBrowserScreen:
         rect = pygame.Rect(0, surface.get_height() - legend_h,
                            surface.get_width(), legend_h)
         pygame.draw.rect(surface, tuple(theme["legend_bg_color"]), rect)
-        font = self.app.fonts.get(max(11, int(ui["font_size_base"] * 0.7)))
         color = tuple(theme["legend_text_color"])
 
-        # Build the legend as a sequence of (kind, payload) tokens so we
-        # can interleave drawn triangle arrows with text. The arrows
-        # aren't in Oxanium so we draw them as polygons.
+        # Directions first, then A, B, X, Y, Select - Title Case. The
+        # font shrinks until the whole line fits the screen width, so
+        # no resolution or font-size setting can push entries off the
+        # right edge (seen on the 1280-wide Smart Pro S).
         sep = "  -  "
-        items_after_arrows = [
-            "Choose system",
-            sep + "A Enter",
-            sep + "X Delete system",
-            sep + "Y WebDAV",
-            sep + "Sel Settings",
-            sep + "B Exit",
-        ]
+        text = ("Navigate" + sep + "A Enter" + sep + "B Exit"
+                + sep + "X Delete System" + sep + "Y WebDAV"
+                + sep + "Sel Settings")
 
-        arrow_h = font.get_height() - 4
-        arrow_w = arrow_h
-        gap = 4
+        size = max(11, int(ui["font_size_base"] * 0.7))
+        while size > 10:
+            font = self.app.fonts.get(size)
+            icon_w = font.get_height() + 6
+            if icon_w + 8 + font.size(text)[0] + 16 <= rect.w:
+                break
+            size -= 1
+        font = self.app.fonts.get(size)
+        icon_w = font.get_height() + 6
 
         x = rect.x + 8
         y_center = rect.y + rect.height // 2
-
-        # Left arrow
-        self._blit_arrow(surface, color, x, y_center, arrow_w, arrow_h, "left")
-        x += arrow_w + gap
-        # Right arrow
-        self._blit_arrow(surface, color, x, y_center, arrow_w, arrow_h, "right")
-        x += arrow_w + gap + 4  # extra gap before text
-
-        for s in items_after_arrows:
-            surf = font.render(s, True, color)
-            surface.blit(surf, (x, y_center - surf.get_height() // 2))
-            x += surf.get_width()
+        self._blit_dpad(surface, color, x, y_center, font.get_height())
+        x += icon_w + 6
+        label = font.render(text, True, color)
+        surface.blit(label, (x, y_center - label.get_height() // 2))
 
     @staticmethod
-    def _blit_arrow(surface, color, x, y_center, w, h, direction):
-        """Draw a filled triangle arrow pointing left or right. The
-        leftmost point sits at x; the triangle is vertically centred
-        on y_center."""
-        if direction == "left":
-            points = [
-                (x, y_center),
-                (x + w, y_center - h // 2),
-                (x + w, y_center + h // 2),
-            ]
-        else:  # right
-            points = [
-                (x + w, y_center),
-                (x, y_center - h // 2),
-                (x, y_center + h // 2),
-            ]
-        pygame.draw.polygon(surface, color, points)
+    def _blit_dpad(surface, color, x, y_center, h):
+        """A d-pad glyph (ES-style cross) drawn as two crossing bars
+        with a hollow center."""
+        size = h - 2
+        size -= size % 2
+        bar = max(4, size // 3)
+        top = y_center - size // 2
+        cx = x + (size - bar) // 2
+        cy = y_center - bar // 2
+        pygame.draw.rect(surface, color,
+                         pygame.Rect(cx, top, bar, size), border_radius=2)
+        pygame.draw.rect(surface, color,
+                         pygame.Rect(x, cy, size, bar), border_radius=2)
+

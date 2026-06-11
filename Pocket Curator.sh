@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.63.1
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.63.2
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -288,6 +288,7 @@ else
   # Pyxel runtime: our bundled pygame wheels must be found first.
   export PYTHONPATH="$GAMEDIR/libs.${DEVICE_ARCH}:$GAMEDIR:${PYTHONPATH:-}"
 fi
+PC_ORIG_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
 if [ "$USE_SYSTEM_PYTHON" = "1" ]; then
   # System pygame resolves its own deps via system paths. Don't inject
   # our bundled libs - this matches the working v0.16-v0.26 config.
@@ -438,6 +439,22 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
     *)
       preferred="" ;;
   esac
+  # PortMaster-shipped SDL builds (newer than 2.28.4, kmsdrm-capable)
+  # as additional preload candidates. The v0.63.1 AmberELEC log proved
+  # the bundled pygame SDL simply has no kmsdrm driver and the system
+  # SDL (2.26.2) is rejected as a downgrade - a PortMaster SDL is the
+  # remaining path to a real display there.
+  pm_sdl_count=0
+  for pmsdl in "$controlfolder"/libs/libSDL2-2.0.so* \
+               "$controlfolder"/libs."$DEVICE_ARCH"/libSDL2-2.0.so* \
+               /roms/ports/PortMaster/libs/libSDL2-2.0.so* \
+               /opt/system/Tools/PortMaster/libs/libSDL2-2.0.so*; do
+    [ -f "$pmsdl" ] || continue
+    [ "$pmsdl" = "$SYS_SDL2" ] && continue
+    pm_sdl_count=$((pm_sdl_count + 1))
+    echo "[Pocket Curator] PortMaster SDL found: $pmsdl (probe candidate)"
+    probe_attempts+=("kmsdrm+pmSDL${pm_sdl_count}|kmsdrm|LD_PRELOAD=$pmsdl")
+  done
   if [ -n "$preferred" ]; then
     probe_attempts=("$preferred" "${probe_attempts[@]}")
   fi
@@ -477,12 +494,20 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   echo "[Pocket Curator] ==== probe complete: driver='${WORKING_DRIVER:-NONE}' env='${WORKING_ENV:-none}' ===="
   if [ -z "$WORKING_DRIVER" ]; then
     rm -f "$PC_PROBE_CACHE" 2>/dev/null
-    pm_message "Pocket Curator: no working display driver on this firmware. Returning to EmulationStation. (Details in pocketcurator.log)"
-    sleep 10
+    # pm_message runs PortMaster's own Python UI - it must NOT inherit
+    # our bundled-runtime environment (v0.63.1: pugwash died on a
+    # missing libffi.so.7 and the device wedged instead of returning
+    # to ES).
+    unset PYTHONHOME PYTHONPATH PYTHONPYCACHEPREFIX SDL_VIDEODRIVER LD_PRELOAD
+    export LD_LIBRARY_PATH="$PC_ORIG_LD_LIBRARY_PATH"
     kill -9 "$GPTK_PID" 2>/dev/null || true
+    wait "$GPTK_PID" 2>/dev/null
+    $ESUDO pkill -9 -f '[g]ptokeyb' 2>/dev/null || true
     if [[ "$PM_CAN_MOUNT" != "N" ]]; then
       $ESUDO umount "$py_dir" 2>/dev/null || true
     fi
+    pm_message "Pocket Curator: no working display driver on this firmware. Returning to EmulationStation. (Details in pocketcurator.log)"
+    sleep 3
     pm_finish
     exit 1
   fi

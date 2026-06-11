@@ -46,6 +46,9 @@ from ..webdav import DavClient, DavError, RemoteEntry, format_size
 from ..render import (draw_stars, draw_wrapped_text, render_clipped_text,
                       wrap_text)
 
+FETCH_GREEN = (64, 224, 96)   # marked-for-fetch: the inverse mood of
+                              # deletion's red X - bright green plus
+
 MEDIA_DIRS = ("images", "videos", "manuals", "media", "downloaded_images")
 MEDIA_TAGS = ("image", "thumbnail", "marquee", "video", "manual")
 PREVIEW_DEBOUNCE_MS = 450
@@ -90,6 +93,7 @@ class RemoteBrowserScreen:
 
         self._loading = True
         self._loading_msg = "Opening connection..."
+        self._copied_any = False
 
         self._listing_cache: Dict[str, List[RemoteEntry]] = {}
         self._gamelist_cache: Dict[str, Optional[_RemoteGamelist]] = {}
@@ -297,7 +301,8 @@ class RemoteBrowserScreen:
         self.toast = msg
         self._toast_until = pygame.time.get_ticks() + ms
 
-    def _start_copy(self, with_media: bool) -> None:
+    def _start_copy(self, with_media: bool,
+                    skip_existing: bool = False) -> None:
         ctx = self.context
         if ctx is None:
             self._toastline("This handheld has no system matching "
@@ -312,22 +317,36 @@ class RemoteBrowserScreen:
             q = FetchQueue(self.client, dest)
             self.app.fetch_queue = q
         jobs: List[FetchJob] = []
+        skipped = 0
         for i in sorted(self.flagged):
             e = self.entries[i]
+            if skip_existing and (dest / e.name).exists():
+                skipped += 1
+                continue
             media = self._media_for(e) if with_media else []
             jobs.append(FetchJob(title=Path(e.name).stem, rom_href=e.href,
                                  rom_name=e.name, rom_size=e.size,
                                  media=media))
+        if not jobs:
+            self.flagged.clear()
+            self._toastline("All of those are already on this handheld - "
+                            "nothing to copy.")
+            return
         err = q.enqueue(jobs)
         if err:
             self._toastline(err)
         else:
             self.app.fetches_occurred = True
+            self._copied_any = True
             self.flagged.clear()
-            self._toastline(
-                f"Queued {len(jobs)} game{'s' if len(jobs) != 1 else ''} "
-                f"for {ctx['display']}"
-                + (" with scrapings" if with_media else ""))
+            note = (f"Queued {len(jobs)} "
+                    f"game{'s' if len(jobs) != 1 else ''} "
+                    f"for {ctx['display']}")
+            if skipped:
+                note += f" ({skipped} already here, skipped)"
+            elif with_media:
+                note += " with scrapings"
+            self._toastline(note)
 
     # ------------------------------------------------------------------
     # Input
@@ -354,7 +373,20 @@ class RemoteBrowserScreen:
         elif k == pygame.K_END:
             self._jump_to(len(self.entries) - 1)
         elif k == pygame.K_RETURN:
-            self._activate()
+            e = (self.entries[self.selected]
+                 if self.entries else None)
+            if (e is not None and not e.is_dir
+                    and self.app.is_repeat(k)):
+                # Hold-A mass-mark, exactly like the deletion list:
+                # advance first, then mark, so the initial press's mark
+                # isn't undone by the first repeat tick.
+                old_sel = self.selected
+                self._move(+1, wrap=False)
+                cur = self.entries[self.selected]
+                if self.selected != old_sel and not cur.is_dir:
+                    self.flagged.add(self.selected)
+            else:
+                self._activate()
         elif k == pygame.K_x:
             self._confirm_copy()
         elif k == pygame.K_y:
@@ -366,10 +398,18 @@ class RemoteBrowserScreen:
             from .settings_screen import SettingsScreen
             self.app.push_screen(SettingsScreen(self.app))
 
-    def _move(self, d: int) -> None:
+    def _move(self, d: int, wrap=None) -> None:
+        """Same semantics as the deletion list: wrap on a tap, stop at
+        the ends while a direction is held."""
         if not self.entries:
             return
-        self.selected = max(0, min(len(self.entries) - 1, self.selected + d))
+        n = len(self.entries)
+        if wrap is None:
+            wrap = not self.app.is_repeat()
+        if wrap and (self.selected + d < 0 or self.selected + d >= n):
+            self.selected = (self.selected + d) % n
+        else:
+            self.selected = max(0, min(n - 1, self.selected + d))
         self._preview_due_ms = pygame.time.get_ticks() + PREVIEW_DEBOUNCE_MS
 
     def _jump_to(self, index: int) -> None:
@@ -392,10 +432,40 @@ class RemoteBrowserScreen:
 
     def _go_back(self) -> None:
         """B: exactly one level back along the visited path; at the top
-        of the stack, leave the browser (the connection itself stays
-        usable by the queue until the screen is gone)."""
+        of the stack, leave the browser - reminding the user, if this
+        session copied anything, that ES only learns about the new
+        games when Pocket Curator exits."""
         if self._nav:
             self._load_async(self._nav.pop(), push=False)
+            return
+        if self._copied_any:
+            self._copied_any = False
+            from .remote_flow import _MenuScreen
+
+            class _ExitNotice(_MenuScreen):
+                def __init__(nself, app, browser):
+                    super().__init__(app,
+                                     "Your new games are copied",
+                                     footer="A OK")
+                    nself.browser = browser
+                    nself.items = ["OK"]
+                    nself.status = ("EmulationStation's games list will "
+                                    "show them after you exit "
+                                    "Pocket Curator.")
+
+                def _activate(nself, index):
+                    nself.app.pop_screen()      # this notice
+                    nself.app.pop_screen()      # the browser
+
+                def handle_event(nself, event):
+                    # B dismisses the same way - both leave the browser
+                    if (event.type == pygame.KEYDOWN
+                            and event.key == pygame.K_ESCAPE):
+                        nself._activate(0)
+                        return
+                    super().handle_event(event)
+
+            self.app.push_screen(_ExitNotice(self.app, self))
         else:
             self.app.pop_screen()
 
@@ -411,7 +481,7 @@ class RemoteBrowserScreen:
         from .remote_confirm import RemoteConfirmScreen
         self.app.push_screen(RemoteConfirmScreen(
             self.app, self.context, marked,
-            on_choice=lambda with_media: self._start_copy(with_media)))
+            on_choice=self._start_copy))
 
     # ------------------------------------------------------------------
     # Preview (remote gamelist + screenshot)
@@ -442,10 +512,11 @@ class RemoteBrowserScreen:
                 tmp = self._tmpdir / f"prev_{sel}.img"
                 tmp.write_bytes(raw)
                 img = pygame.image.load(str(tmp))
-                # scale exactly like ImageCache.load_scaled: fit inside
-                # the box, never upscale past 1x
+                # scale exactly like ImageCache.load_scaled: fit the
+                # box with NO upscale cap - remote thumbs are small and
+                # the deletion screen grows them to fill the panel
                 scale = min(max_w / img.get_width(),
-                            max_h / img.get_height(), 1.0)
+                            max_h / img.get_height())
                 img = pygame.transform.smoothscale(
                     img, (max(1, int(img.get_width() * scale)),
                           max(1, int(img.get_height() * scale))))
@@ -461,10 +532,13 @@ class RemoteBrowserScreen:
         W = pygame.display.get_surface().get_width()
         H = pygame.display.get_surface().get_height()
         legend_h = max(28, ui["font_size_base"] + 8)
+        hdr_font = self.app.fonts.get(
+            max(11, int(ui["font_size_base"] * 0.7)))
+        header_h = hdr_font.get_linesize() + 6
         list_w = int(W * ui["list_width_pct"])
         pad = 16
         max_w = (W - list_w) - 2 * pad
-        max_h = int((H - legend_h) * 0.70)
+        max_h = int((H - legend_h - header_h) * 0.70)
         threading.Thread(target=work,
                          args=(self.selected, e, max_w, max_h),
                          daemon=True).start()
@@ -483,8 +557,13 @@ class RemoteBrowserScreen:
 
         legend_h = max(28, base + 8)
         list_w = int(W * ui["list_width_pct"])
-        list_rect = pygame.Rect(0, 0, list_w, H - legend_h)
-        right_rect = pygame.Rect(list_w, 0, W - list_w, H - legend_h)
+        from ..render import draw_screen_header
+        header_h = draw_screen_header(surface, self.app, theme, ui,
+                                      "FETCH FROM WebDAV")
+        list_rect = pygame.Rect(0, header_h, list_w,
+                                H - legend_h - header_h)
+        right_rect = pygame.Rect(list_w, header_h, W - list_w,
+                                 H - legend_h - header_h)
 
         if self._loading:
             font = self.app.fonts.get(base)
@@ -532,22 +611,37 @@ class RemoteBrowserScreen:
                        min(len(self.entries), self.scroll + visible)):
             e = self.entries[i]
             row = pygame.Rect(rect.x, y, rect.w, line_h)
+            flagged = i in self.flagged
             if i == self.selected:
                 pygame.draw.rect(surface, hi, row)
-            fg = hi_text if i == self.selected else text_c
+            # Marked-for-fetch rows go bright green (text and plus),
+            # the mirror image of deletion's red-X-and-grey.
+            if flagged:
+                fg = FETCH_GREEN
+            else:
+                fg = hi_text if i == self.selected else text_c
             x = row.x + 8
             if e.is_dir:
                 x += self._draw_folder_icon(surface, x, row, fg) + 8
-            elif i in self.flagged:
-                mark = font.render("+", True,
-                                   tuple(theme.get("flagged_color", fg))
-                                   if i != self.selected else fg)
-                surface.blit(mark, (x, row.y + 1))
-                x += mark.get_width() + 8
+            elif flagged:
+                x += self._draw_plus(surface, x, row, FETCH_GREEN) + 8
             render_clipped_text(surface, e.name, font, fg,
                                 pygame.Rect(x, row.y + 1,
                                             row.right - x - 8, line_h))
             y += line_h
+
+    @staticmethod
+    def _draw_plus(surface, x, row, color) -> int:
+        """A thick plus sign drawn as two crossing bars."""
+        size = max(10, int(row.h * 0.58))
+        size -= size % 2
+        bar = max(3, size // 3)
+        top = row.y + (row.h - size) // 2
+        cx = x + (size - bar) // 2
+        cy = top + (size - bar) // 2
+        pygame.draw.rect(surface, color, pygame.Rect(cx, top, bar, size))
+        pygame.draw.rect(surface, color, pygame.Rect(x, cy, size, bar))
+        return size
 
     @staticmethod
     def _draw_folder_icon(surface, x, row, color) -> int:

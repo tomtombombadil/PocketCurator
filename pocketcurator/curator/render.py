@@ -294,3 +294,18 @@ def _draw_one_star(surface: pygame.Surface,
         pygame.draw.polygon(surface, accent, points)
     finally:
         surface.set_clip(prev_clip)
+
+
+def draw_screen_header(surface: pygame.Surface, app, theme, ui,
+                       text: str) -> int:
+    """Title strip across the top of full-screen lists ("MARK FOR
+    DELETE" / "FETCH FROM WebDAV") so visually similar screens are
+    instantly tellable apart. Returns the strip height so callers can
+    shift their panels down by it."""
+    font = app.fonts.get(max(11, int(ui["font_size_base"] * 0.7)))
+    h = font.get_linesize() + 6
+    rect = pygame.Rect(0, 0, surface.get_width(), h)
+    pygame.draw.rect(surface, tuple(theme["legend_bg_color"]), rect)
+    label = font.render(text, True, tuple(theme["legend_text_color"]))
+    surface.blit(label, (10, rect.y + (h - label.get_height()) // 2))
+    return h

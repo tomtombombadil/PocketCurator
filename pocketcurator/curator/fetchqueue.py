@@ -91,6 +91,13 @@ class FetchQueue:
         (and queues nothing) when there isn't room for everything
         already queued plus the new jobs."""
         with self._lock:
+            # A fresh batch (worker idle, nothing pending) starts the
+            # counters over - otherwise the second copy session of the
+            # day opens with the bar half full and "72/142" in the
+            # legend, which is the previous session leaking through.
+            if ((self._thread is None or not self._thread.is_alive())
+                    and not self._jobs):
+                self._snap = QueueSnapshot()
             need = sum(j.total_bytes() for j in self._jobs)
             need += sum(j.total_bytes() for j in jobs)
             free = shutil.disk_usage(self.dest_dir).free

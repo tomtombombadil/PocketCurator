@@ -2,6 +2,66 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.63.2] - 2026-06-11
+
+Second field-test round (RG35xxSP, Smart Pro S, RG552).
+
+### Fetch browser: full deletion-screen parity
+- Screenshots now upscale to fill the panel exactly like the deletion
+  screens (ImageCache grows small art with no cap; the fetch preview
+  wrongly capped at 1x).
+- Hold-A mass-marks by advancing then marking, identical to deletion;
+  up at the top of the list wraps to the bottom on a tap (and stops at
+  the ends while held), identical to deletion.
+- Marked-for-fetch rows show a thick bright-green plus and the row
+  text turns the same green - the mirror image of deletion's red X and
+  grey - clearing when the copies are queued.
+- Headers across both screens: MARK FOR DELETE on deletion, FETCH FROM
+  WebDAV on fetch, so the look-alike screens are instantly tellable
+  apart.
+
+### Fetch flow
+- The copy queue's counters and progress bar reset when a new batch
+  starts on an idle queue - the second copy session no longer opens at
+  "72/142" with a half-full bar.
+- The confirmation now counts how many of the marked games already
+  exist in the destination system folder and, if any do, asks:
+  Overwrite Them / Skip Them / Cancel. Skip copies only what's missing
+  and says how many it skipped.
+- Backing out of the fetch browser after copying shows a one-line
+  notice that EmulationStation's games list updates when Pocket
+  Curator exits.
+
+### System carousel legend
+- Reordered and restyled per design: a d-pad glyph + "Navigate", then
+  A Enter, B Exit, X Delete System, Y WebDAV, Sel Settings - Title
+  Case throughout - and the whole line now shrinks to fit the screen
+  width, so it can never run off the right edge regardless of
+  resolution or font-size setting. (The "font size 52" on the Smart
+  Pro S = font_size_base 33 from settings.json x the 1.5 resolution
+  scale for its 1280x720 screen; lower Font Size in Settings to taste,
+  and the legend now fits regardless.)
+
+### AmberELEC display - root cause found, two fixes, one honest limit
+- v0.63.1's log proved the real story: pygame's bundled SDL was built
+  WITHOUT the kmsdrm driver ("kmsdrm not available" persists even with
+  the display released first), and AmberELEC's system SDL (2.26.2) is
+  rejected by pygame as a version downgrade. dArkOS only works because
+  its system SDL (2.32) is an allowed upgrade.
+- New probe candidates: any PortMaster-shipped libSDL2 found on the
+  device (these are newer, kmsdrm-capable builds and the one
+  remaining path to a real display on AmberELEC). The log will show
+  "PortMaster SDL found:" lines if any exist.
+- The no-driver abort now cleans our Python environment before calling
+  PortMaster's message UI - v0.63.1's abort crashed pugwash on a
+  missing libffi.so.7 (it inherited our PYTHONHOME) and wedged the
+  device instead of returning to ES. It also kills gptokeyb before the
+  dialog so input can't ghost.
+- If no PortMaster SDL exists or none works, AmberELEC now cleanly
+  returns to ES with a message. Actually displaying on that device
+  would then require shipping our own kmsdrm-enabled SDL build - a
+  scope decision to make deliberately, not a bug to patch.
+
 ## [0.63.1] - 2026-06-11
 
 Field-test fixes for the WebDAV fetch feature plus two launcher-level

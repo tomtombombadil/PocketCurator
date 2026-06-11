@@ -170,6 +170,9 @@ class GameListScreen:
         list_w = int(screen_w * ui["list_width_pct"])
         right_x = list_w
         right_w = screen_w - list_w
+        from ..render import draw_screen_header
+        header_h = draw_screen_header(surface, self.app, theme, ui,
+                                      "MARK FOR DELETE")
 
         # Reset description scroll if the selection changed. Note we MUST
         # invalidate the cache_key here too - without that, the re-wrap
@@ -185,10 +188,11 @@ class GameListScreen:
             self._last_selection = self.selected
 
         self._draw_left_panel(surface, theme, ui,
-                              pygame.Rect(0, 0, list_w, screen_h - legend_h))
+                              pygame.Rect(0, header_h, list_w,
+                                           screen_h - legend_h - header_h))
         self._draw_right_panel(surface, theme, ui,
-                               pygame.Rect(right_x, 0, right_w,
-                                           screen_h - legend_h))
+                               pygame.Rect(right_x, header_h, right_w,
+                                           screen_h - legend_h - header_h))
         self._draw_legend(surface, theme, ui,
                           pygame.Rect(0, screen_h - legend_h, screen_w, legend_h))
 
