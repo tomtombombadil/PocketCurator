@@ -39,8 +39,15 @@ class RemoteConfirmScreen(_MenuScreen):
         self.media_bytes = media_bytes
         dest = Path(system["path"])
         self.existing = [e for e in marked if (dest / e.name).exists()]
+        # disk_usage needs an existing path; an empty-but-new system
+        # folder may not be on disk yet, so walk up to the nearest
+        # real ancestor (the roms mount), which shares the filesystem
+        # the copy will land on.
+        probe = dest
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
         try:
-            self.free = shutil.disk_usage(dest).free
+            self.free = shutil.disk_usage(probe).free
         except OSError:
             self.free = None
         self.items = [

@@ -2,6 +2,55 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.64.2] - 2026-06-11
+
+### AmberELEC: the SDL build now actually loads
+- v0.64.1's `pcsdl` SDL was rejected by the RG552's loader before
+  kmsdrm could even be tried: `GLIBC_2.38 not found in libm.so.6 /
+  libc.so.6`. Root cause: Ubuntu's stock gcc-aarch64-linux-gnu links
+  its OWN glibc (2.38) into every binary regardless of --sysroot, so
+  the .so demanded a glibc newer than the device has.
+- Fixed by rebuilding with Bootlin's 2018.11 aarch64 toolchain, whose
+  glibc baseline is 2.27. The shipped `libs.aarch64/pcsdl/
+  libSDL2-2.0.so.0` now tops out at GLIBC_2.27 (three `*f` math
+  symbols) - comfortably below any AmberELEC/ROCKNIX/dArkOS runtime
+  (the device already loads SDL 2.32 system libraries and the bundled
+  pygame's own SDL, which needs only 2.17). KMSDRM is compiled in
+  (dlopen mode); libdrm/libgbm/EGL/GLES resolve from the device's
+  /usr/lib at runtime. tools/build_pcsdl.sh documents the toolchain
+  requirement so this isn't relearned.
+
+### Fetch destinations: empty system folders count
+- Marking a Jaguar game and hitting Copy no longer says "can't copy
+  here" when the device has an empty roms/atarijaguar folder. System
+  discovery still needs >=1 ROM to SHOW a system, but a fetch
+  DESTINATION only needs the folder to exist on disk - so empty,
+  ready-to-fill system folders are now valid copy targets. Applied to
+  both the EmulationStation and filesystem-fallback discovery paths.
+
+### Free space
+- The free-space figure is computed against the nearest existing
+  ancestor of the destination, so an empty-but-new system folder
+  reports the real roms-mount free space instead of misresolving.
+
+### Region display
+- Regions are shown in conventional caps on the fetch panel: US, EU,
+  JP, Japan, Europe, World, etc., instead of lowercase us/eu/jp.
+  Multi-region strings keep their separators (USA, Europe).
+
+### After-copy notice
+- Reworded to the agreed text, headed "ATTENTION": "The games you
+  just downloaded are NOT in the games lists yet. Not in Emulation
+  Station or Pocket Curator. They will appear after the games lists
+  refresh, which happens when you exit Pocket Curator."
+
+### WebDAV connection robustness
+- A single transient socket failure was surfacing as "the server
+  isn't answering" while the server was demonstrably up. Requests now
+  retry once on a fresh connection after a short pause, and the
+  default timeout is 15s (was 10s) to accommodate a handheld radio
+  negotiating its first connection.
+
 ## [0.64.1] - 2026-06-11
 
 ### AmberELEC: we built the missing SDL

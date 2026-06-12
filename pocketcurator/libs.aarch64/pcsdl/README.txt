@@ -8,6 +8,11 @@ too old (2.26.x) for pygame to accept as a preload.
 
 - Version 2.28.4 exactly matches the bundled pygame's SDL, so
   LD_PRELOADing it passes pygame's version check everywhere.
+- Built with Bootlin's 2018.11 aarch64 toolchain (glibc 2.27 baseline)
+  NOT Ubuntu's cross-gcc: the latter links its own glibc 2.38 no
+  matter what, and the device's loader rejects GLIBC_2.38. The shipped
+  .so tops out at GLIBC_2.27 (three *f math symbols), well under any
+  AmberELEC/ROCKNIX/dArkOS runtime.
 - KMSDRM, EGL, and GLES are resolved at runtime via dlopen of the
   device's own /usr/lib libraries (libdrm.so.2, libgbm.so.1,
   libEGL.so.1, libGLESv2.so.2) - nothing else is bundled.

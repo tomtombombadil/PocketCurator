@@ -80,7 +80,7 @@ class Source:
 
 
 class DavClient:
-    def __init__(self, source: Source, timeout: float = 10.0):
+    def __init__(self, source: Source, timeout: float = 15.0):
         self.source = source
         self.timeout = timeout
         u = urllib.parse.urlsplit(source.url if "://" in source.url
@@ -135,18 +135,31 @@ class DavClient:
 
     def _request(self, method: str, path: str, body: Optional[bytes] = None,
                  extra_headers: Optional[dict] = None):
-        conn = self._conn()
-        try:
-            conn.request(method, self._url_path(path), body=body,
-                         headers=self._headers(extra_headers))
-            resp = conn.getresponse()
-        except (OSError, http.client.HTTPException) as exc:
-            conn.close()
-            raise DavError(self._excuse(exc)) from exc
-        if resp.status == 401:
-            conn.close()
-            raise DavAuthRequired("This server requires a login.")
-        return conn, resp
+        # One automatic retry: handhelds drop a beat of WiFi or hit a
+        # half-open socket constantly, and a single transient failure
+        # was surfacing as "server isn't answering" while the server
+        # was plainly up. A fresh connection on the second try clears
+        # both stale-socket and momentary-blip cases.
+        last_exc = None
+        for attempt in (1, 2):
+            conn = self._conn()
+            try:
+                conn.request(method, self._url_path(path), body=body,
+                             headers=self._headers(extra_headers))
+                resp = conn.getresponse()
+            except (OSError, http.client.HTTPException) as exc:
+                conn.close()
+                last_exc = exc
+                if attempt == 1:
+                    import time as _t
+                    _t.sleep(0.4)
+                    continue
+                raise DavError(self._excuse(exc)) from exc
+            if resp.status == 401:
+                conn.close()
+                raise DavAuthRequired("This server requires a login.")
+            return conn, resp
+        raise DavError(self._excuse(last_exc))   # unreachable
 
     def _excuse(self, exc: Exception) -> str:
         s = str(exc)

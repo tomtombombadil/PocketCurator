@@ -122,6 +122,16 @@ def load_systems_db(package_dir: Path) -> dict:
         return {}
 
 
+_last_all_targets: List[dict] = []
+
+
+def all_fetch_targets() -> List[dict]:
+    """Every ES system with a real roms folder on disk - including
+    empty ones - usable as a fetch destination. Populated by the most
+    recent discover_systems() call."""
+    return list(_last_all_targets)
+
+
 def discover_systems(roms_dir: Path, systems_db: dict) -> List[dict]:
     """
     Return the list of systems Pocket Curator should offer to manage.
@@ -220,6 +230,26 @@ def _discover_from_es(es_dir: Path) -> List[dict]:
             "rom_count":  rom_count,
         })
 
+    _last_all_targets.clear()
+    for sys in raw_systems:
+        if _is_auto_collection(sys["shortname"]):
+            continue
+        path = sys["path"]
+        # A fetch DESTINATION only needs a real folder on disk - not
+        # any ROMs yet. The device's empty roms/atarijaguar is a valid
+        # place to copy a Jaguar game even though discovery (which
+        # needs >=1 ROM to SHOW a system) skipped it.
+        if not path.is_dir():
+            continue
+        _last_all_targets.append({
+            "shortname":  sys["shortname"],
+            "display":    sys["display"],
+            "path":       path,
+            "extensions": sys["extensions"],
+            "theme":      sys["theme"],
+            "rom_count":  0,
+        })
+
     if skipped_special:
         print(f"[discover] skipping non-game ES systems: "
               f"{sorted(skipped_special)}")
@@ -233,6 +263,7 @@ def _discover_from_es(es_dir: Path) -> List[dict]:
 def _discover_from_filesystem(roms_dir: Path, systems_db: dict) -> List[dict]:
     """Legacy heuristic scanner. Used only when ES config is missing."""
     systems: List[dict] = []
+    _last_all_targets.clear()
     try:
         children = sorted(roms_dir.iterdir(), key=lambda p: p.name.lower())
     except OSError:
@@ -262,6 +293,18 @@ def _discover_from_filesystem(roms_dir: Path, systems_db: dict) -> List[dict]:
         display = meta.get("display", entry.name)
         extensions = [ext.lower() for ext in meta.get("extensions", [])]
         known_system = entry.name.lower() in systems_db_lower
+
+        # A known-DB folder is a valid fetch destination even with no
+        # ROMs yet (empty atarijaguar), mirroring the ES path.
+        if known_system:
+            _last_all_targets.append({
+                "shortname":  entry.name,
+                "display":    display,
+                "path":       entry,
+                "extensions": extensions,
+                "theme":      entry.name,
+                "rom_count":  0,
+            })
 
         rom_count = _count_candidates(entry, extensions)
         if rom_count == 0:

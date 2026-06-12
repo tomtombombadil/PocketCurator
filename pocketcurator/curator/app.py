@@ -237,6 +237,10 @@ class App:
 
         systems = discover_systems(self.roms_dir, self.systems_db)
         self.all_systems = systems
+        from .firmware import all_fetch_targets
+        # Destinations for Fetch include empty-but-present roms folders
+        # (e.g. atarijaguar with no ROMs yet), which discovery omits.
+        self.fetch_targets = all_fetch_targets() or systems
         self._mark(f"ROM scan done ({len(systems)} systems, "
                    f"{sum(s.get('rom_count', 0) for s in systems)} ROMs)")
         from .ui.system_browser import SystemBrowserScreen

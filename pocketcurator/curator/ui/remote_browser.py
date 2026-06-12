@@ -36,6 +36,7 @@ import tempfile
 import threading
 import urllib.parse
 import xml.etree.ElementTree as ET
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
@@ -129,6 +130,32 @@ _ALIASES = {}
 for _grp in ALIAS_GROUPS:
     for _n in _grp:
         _ALIASES[_n] = _grp
+
+
+_REGION_CAPS = {
+    "us": "US", "usa": "USA", "eu": "EU", "europe": "Europe",
+    "jp": "JP", "jpn": "JP", "japan": "Japan", "world": "World",
+    "uk": "UK", "fr": "FR", "de": "DE", "es": "ES", "it": "IT",
+    "kr": "KR", "korea": "Korea", "cn": "CN", "china": "China",
+    "br": "BR", "au": "AU", "ca": "CA", "asia": "Asia",
+}
+
+
+def _format_region(region: str) -> str:
+    """Display regions in their conventional caps: us -> US, eu -> EU,
+    japan -> Japan. Multi-region strings (USA, Europe) keep their
+    separators."""
+    if not region:
+        return ""
+    parts = re.split(r"([,/|]| - )", region)
+    out = []
+    for p in parts:
+        key = p.strip().lower()
+        if key in _REGION_CAPS:
+            out.append(p.replace(p.strip(), _REGION_CAPS[key]))
+        else:
+            out.append(p)
+    return "".join(out)
 
 
 def expand_names(name: str):
@@ -621,12 +648,11 @@ class RemoteBrowserScreen:
             def leave():
                 self.app.pop_screen()           # the browser
             self.app.push_screen(NoticeScreen(
-                self.app, "Heads up",
-                "The games you just copied are NOT in the games lists "
-                "yet - not in EmulationStation, and not in Pocket "
-                "Curator's delete lists either. They appear when the "
-                "games list refreshes, which happens when you exit "
-                "Pocket Curator.",
+                self.app, "ATTENTION",
+                "The games you just downloaded are NOT in the games "
+                "lists yet. Not in Emulation Station or Pocket Curator. "
+                "They will appear after the games lists refresh, which "
+                "happens when you exit Pocket Curator.",
                 on_close=leave))
         else:
             self.app.pop_screen()
@@ -902,6 +928,7 @@ class RemoteBrowserScreen:
             m = _re.search(r"\(([^)]+)\)", e.name)
             if m and len(m.group(1)) <= 24:
                 region = m.group(1)
+        region = _format_region(region)
         x = rect.x + pad
         x += draw_stars(surface, x, y, rating,
                         tuple(theme["accent_color"]), muted) + 12

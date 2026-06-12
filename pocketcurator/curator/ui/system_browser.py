@@ -66,8 +66,10 @@ class SystemBrowserScreen:
             if self.systems:
                 try:
                     from .remote_flow import start_fetch
+                    targets = getattr(self.app, "fetch_targets",
+                                      None) or self.systems
                     start_fetch(self.app, self.systems[self.selected],
-                                self.systems)
+                                targets)
                 except Exception as exc:  # noqa: BLE001
                     print(f"[fetch] feature unavailable: {exc}")
         elif event.key == pygame.K_ESCAPE:
