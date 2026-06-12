@@ -70,9 +70,29 @@ class App:
         pygame.display.init()
         pygame.font.init()
 
+        # Input on kmsdrm: with no compositor to feed us events, SDL must
+        # read the kernel input devices (including gptokeyb's uinput
+        # keyboard) through its own evdev backend - which only starts
+        # scanning once the joystick subsystem is initialized. On
+        # wayland/x11 the compositor delivers keys without this, but
+        # initializing the joystick subsystem there is harmless. We do
+        # NOT call pygame.init() (the umbrella), which would also pull in
+        # the heavy audio mixer we never use.
+        driver = (pygame.display.get_driver() or "").lower()
+        if driver not in ("wayland", "x11"):
+            try:
+                pygame.joystick.init()
+                for _ji in range(pygame.joystick.get_count()):
+                    pygame.joystick.Joystick(_ji).init()
+                print(f"[app] {driver}: joystick subsystem up "
+                      f"({pygame.joystick.get_count()} device(s)) for evdev "
+                      f"key input")
+            except Exception as _exc:  # noqa: BLE001
+                print(f"[app] joystick init skipped: {_exc}")
+
         info = pygame.display.Info()
-        self.screen_w = info.current_w
-        self.screen_h = info.current_h
+        disp_w = info.current_w
+        disp_h = info.current_h
 
         # Note on flags: SDL2 2.28's Wayland backend has known crashes when
         # you pass FULLSCREEN. Borderless at full display size looks the
@@ -83,7 +103,40 @@ class App:
             flags = pygame.NOFRAME
         else:
             flags = 0
-        self.surface = pygame.display.set_mode((self.screen_w, self.screen_h), flags)
+        self._display = pygame.display.set_mode((disp_w, disp_h), flags)
+
+        # Display rotation. Some panels (notably the Anbernic RG552) are
+        # physically mounted in landscape but exposed by KMSDRM as a
+        # portrait framebuffer (1152x1920); drawing straight into that
+        # paints the UI sideways. We detect the need and draw into a
+        # LOGICAL landscape surface, then rotate-blit it onto the real
+        # display each frame, so no drawing code anywhere has to know.
+        #
+        # Resolution order: explicit PC_ROTATE env (0/90/180/270 from the
+        # launcher) wins; otherwise auto-rotate a portrait panel 90deg so
+        # the wider dimension becomes the UI width.
+        rot_env = os.environ.get("PC_ROTATE", "").strip()
+        if rot_env in ("0", "90", "180", "270"):
+            self._rotation = int(rot_env)
+        elif disp_h > disp_w:
+            # Portrait framebuffer on a device meant to be held in
+            # landscape -> rotate 90 clockwise for display.
+            self._rotation = 90
+        else:
+            self._rotation = 0
+
+        if self._rotation in (90, 270):
+            self.screen_w, self.screen_h = disp_h, disp_w
+            self.surface = pygame.Surface((self.screen_w, self.screen_h))
+        elif self._rotation == 180:
+            self.screen_w, self.screen_h = disp_w, disp_h
+            self.surface = pygame.Surface((self.screen_w, self.screen_h))
+        else:
+            self.screen_w, self.screen_h = disp_w, disp_h
+            self.surface = self._display     # no rotation: draw direct
+        if self._rotation:
+            print(f"[app] display {disp_w}x{disp_h} rotated {self._rotation}deg "
+                  f"-> logical {self.screen_w}x{self.screen_h}")
         self._mark("display ready")
         pygame.display.set_caption("Pocket Curator")
         pygame.mouse.set_visible(False)
@@ -293,7 +346,7 @@ class App:
                              (pill_x, pill_y, pill_w, pill_h), width=2)
             self.surface.blit(text, (pill_x + pad_x, pill_y + pad_y))
 
-            pygame.display.flip()
+            self._present()
             pygame.event.pump()
         except Exception as exc:
             print(f"[app] status overlay failed: {exc}")
@@ -367,7 +420,7 @@ class App:
                 ((self.screen_w - ver.get_width()) // 2,
                  self.screen_h - ver.get_height() - 12))
 
-            pygame.display.flip()
+            self._present()
             # Service Wayland/X events so the compositor actually presents the
             # frame before we block on the long ROM walk. Without this the
             # frame can sit unrendered until the loop starts.
@@ -375,6 +428,20 @@ class App:
         except Exception as exc:
             # Splash is a nicety, not a hard requirement.
             print(f"[app] splash render failed: {exc}")
+
+    def _present(self) -> None:
+        """Put the logical surface on the real display, rotating if the
+        panel needs it, then flip. When no rotation is in effect the
+        logical surface IS the display, so this is just a flip."""
+        if self._rotation and self.surface is not self._display:
+            if self._rotation == 90:
+                rotated = pygame.transform.rotate(self.surface, -90)
+            elif self._rotation == 270:
+                rotated = pygame.transform.rotate(self.surface, 90)
+            else:  # 180
+                rotated = pygame.transform.rotate(self.surface, 180)
+            self._display.blit(rotated, (0, 0))
+        pygame.display.flip()  # PRESENT_FLIP
 
     def run(self) -> int:
         self.start()
@@ -428,7 +495,7 @@ class App:
 
             top = self._screens[-1]
             top.draw(self.surface)
-            pygame.display.flip()
+            self._present()
             self.clock.tick(fps_cap)
 
         pygame.quit()

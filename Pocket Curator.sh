@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.64.2
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.64.3
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -537,6 +537,12 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
     export $WORKING_ENV
   fi
   pc_stage "launching the app"
+# Display rotation override (0/90/180/270). Unset = the app auto-rotates
+# a portrait framebuffer (e.g. the RG552's 1152x1920 panel) to landscape.
+# Add a device quirk here if a panel needs a specific angle.
+case "${CFW_NAME}|${DEVICE_NAME:-?}" in
+  *RG552*) export PC_ROTATE="${PC_ROTATE:-90}" ;;
+esac
 echo "[Pocket Curator] running with SDL_VIDEODRIVER=$SDL_VIDEODRIVER extra_env='${WORKING_ENV:-none}'"
 fi
 

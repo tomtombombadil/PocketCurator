@@ -2,6 +2,39 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.64.3] - 2026-06-11
+
+### AmberELEC display works - now upright, with working controls
+The v0.64.2 pcsdl build got the RG552 to a picture at last
+(`display.init(): OK (KMSDRM)`), exposing two follow-on issues that
+this release fixes.
+
+- **Rotation.** The RG552's panel is physically landscape but KMSDRM
+  exposes it as a 1152x1920 PORTRAIT framebuffer, so the UI rendered
+  sideways (90deg clockwise). Pocket Curator now draws into a logical
+  LANDSCAPE surface and rotate-blits it onto the real display every
+  frame, so nothing in the UI code has to know the panel is turned.
+  Portrait framebuffers auto-rotate 90deg; a new PC_ROTATE env
+  (0/90/180/270) overrides per device, and the launcher sets
+  PC_ROTATE=90 for the RG552 by default. ROCKNIX/Knulli/dArkOS, whose
+  framebuffers are already landscape, are unaffected (no rotation, the
+  logical surface IS the display - zero overhead).
+- **Dead controls on kmsdrm.** With no compositor to deliver key
+  events (unlike wayland/x11), SDL must read the kernel input devices
+  itself - including gptokeyb's uinput keyboard - through its evdev
+  backend, which only starts once the joystick subsystem is
+  initialized. Pocket Curator initialized only display and font (to
+  avoid the heavy audio mixer the umbrella init pulls in), so on the
+  kmsdrm path no input was ever read. It now brings up the joystick
+  subsystem whenever the driver isn't wayland/x11, so the buttons work
+  on AmberELEC. The mixer is still never loaded.
+
+### Note for AmberELEC testers
+This is the first build expected to be fully usable on the RG552:
+upright display and working controls via Pocket Curator's own kmsdrm
+SDL (libs.aarch64/pcsdl). If your panel comes up at a wrong angle,
+set PC_ROTATE in the launcher.
+
 ## [0.64.2] - 2026-06-11
 
 ### AmberELEC: the SDL build now actually loads
