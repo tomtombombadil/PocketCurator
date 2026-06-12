@@ -2,6 +2,26 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.3] - 2026-06-12
+
+### Fixed: doubled input on Knulli and dArkOS (the v1.0.2 fix didn't reach them)
+v1.0.2 exported the PC_PAD_INPUT gate inside the display-probe block -
+but the system-python firmwares (Knulli, Batocera) never enter that
+block, so the variable stayed unset there and the app fell back to its
+driver heuristic, doubling every press again. dArkOS was hit by the
+same class of bug since v1.0.0 (its kmsdrm driver tripped the old
+heuristic), which is why v0.63.2 worked there and v1.0.0 didn't.
+
+- PC_PAD_INPUT is now defaulted to 0 EARLY, on every launch path,
+  before any branch. Only our own pcSDL kmsdrm path (AmberELEC, where
+  SDL genuinely can't see gptokeyb's keyboard) flips it to 1 after the
+  probe.
+- Result: Knulli, ROCKNIX, dArkOS, and Batocera all keep their normal
+  single keyboard input; AmberELEC keeps its gamepad translation.
+
+Firmware matrix now verified end to end: AmberELEC translation ON; all
+others OFF.
+
 ## [1.0.2] - 2026-06-12
 
 ### Fixed: doubled controller input on Knulli (and any system-keyboard firmware)

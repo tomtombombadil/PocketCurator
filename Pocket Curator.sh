@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.2
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.3
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -230,6 +230,15 @@ if [[ "${CFW_NAME,,}" == "knulli" || "${CFW_NAME,,}" == "batocera" ]]; then
 else
   USE_SYSTEM_PYTHON=0
 fi
+
+# Gamepad-as-keyboard translation default. OFF for every firmware -
+# gptokeyb's keyboard reaches SDL on all of them EXCEPT our own pcSDL
+# kmsdrm path on AmberELEC, which flips this to 1 after the probe. This
+# default must be set for ALL launch paths (the system-python branch
+# used by Knulli/Batocera never enters the probe block, so without an
+# early default it fell back to the app's driver heuristic and doubled
+# every input).
+export PC_PAD_INPUT=0
 
 if [ "$USE_SYSTEM_PYTHON" = "0" ]; then
   pc_stage "runtime ready"
@@ -549,8 +558,7 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   # gptokeyb's keys DO reach SDL, so the translation would DOUBLE every
   # input. Gate it on the pcSDL preload, which only AmberELEC uses.
   case "${WORKING_ENV:-}" in
-    *pcsdl*) export PC_PAD_INPUT=1 ;;
-    *) export PC_PAD_INPUT=0 ;;
+    *pcsdl*) export PC_PAD_INPUT=1 ;;  # AmberELEC: SDL can't see the keyboard
   esac
   pc_stage "launching the app"
 # Display rotation override (0/90/180/270). Unset = the app auto-rotates
