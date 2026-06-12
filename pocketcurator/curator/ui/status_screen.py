@@ -12,59 +12,43 @@ network rows read 'No Internet Connection'.
 
 from __future__ import annotations
 
-import threading
-
 import pygame
 
 from .. import __version__
-from ..updater import (
-    Updater, check_internet, clock_is_sane, _version_tuple,
-)
+from ..updater import Updater
 
 
 class StatusScreen:
     def __init__(self, app):
         self.app = app
-        self._internet: str = "Checking..."
-        self._latest: str = "Checking..."
         self._closed = False
-        threading.Thread(target=self._probe, daemon=True).start()
 
     # ------------------------------------------------------------------
 
-    def _probe(self) -> None:
-        """Network rows, off the UI thread. Reuses the app's updater so
-        a result here and the Check For Updates row never disagree."""
-        online = check_internet()
-        if self._closed:
-            return
-        if not online:
-            self._internet = "No Internet Connection"
-            self._latest = "No Internet Connection"
-            return
-        self._internet = "Connected"
-
-        if getattr(self.app, "updater", None) is None:
-            self.app.updater = Updater(self.app.port_dir, __version__)
-        u = self.app.updater
+    def _update_status(self) -> str:
+        """Report the LATEST KNOWN update state without checking again -
+        Check For Updates already does that. If no check has run this
+        session, say so rather than reaching out to the network."""
+        u = getattr(self.app, "updater", None)
+        if u is None:
+            return "not checked this session"
         if u.state == "staged":
-            self._latest = f"v{u.latest_version} ready - restart to apply"
-            return
-        if not u.busy():
-            u.start_check()
-        # Wait for the worker (bounded; it has its own timeouts).
-        for _ in range(120):
-            if self._closed or not u.busy():
-                break
-            pygame.time.wait(250)
+            return f"v{u.latest_version} ready - restart to apply"
         if u.state == "available":
-            self._latest = f"v{u.latest_version} available"
-        elif u.state == "up_to_date":
-            self._latest = "latest version"
-        elif u.state == "staged":
-            self._latest = f"v{u.latest_version} ready - restart to apply"
-        else:
-            self._latest = "couldn't check"
+            return f"v{u.latest_version} available"
+        if u.state == "up_to_date":
+            return "up to date"
+        if u.busy():
+            return "checking..."
+        return "not checked this session"
+
+    def _refresh_status(self) -> str:
+        """Whether the games list will be refreshed when Pocket Curator
+        exits. Pending if anything was deleted or fetched this session.
+        """
+        pending = (getattr(self.app, "deletions_occurred", False)
+                   or getattr(self.app, "fetches_occurred", False))
+        return "Pending" if pending else "Not Necessary"
 
     # ------------------------------------------------------------------
 
@@ -116,15 +100,12 @@ class StatusScreen:
         y += title.get_height() + 14
 
         app = self.app
-        clock_ok = clock_is_sane()
         rows = [
-            ("Version", f"v{__version__}  ({self._latest})"),
+            ("Version", f"v{__version__}  ({self._update_status()})"),
+            ("Refresh Games List On Exit", self._refresh_status()),
             ("OS", str(app.firmware_name)),
             ("ROMs Location", str(app.roms_dir) if app.roms_dir else "n/a"),
             ("Theme", app.theme_dir.name if app.theme_dir else "n/a"),
-            ("Internet", self._internet),
-            ("Clock", "Synced (secure connections OK)" if clock_ok
-             else "Not synced - secure connections may fail"),
         ]
 
         label_w = max(body_font.size(lbl + ":")[0] for lbl, _ in rows) + 18

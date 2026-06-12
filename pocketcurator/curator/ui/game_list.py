@@ -167,12 +167,14 @@ class GameListScreen:
         surface.fill(tuple(theme["background_color"]))
 
         legend_h = max(28, ui["font_size_base"] + 8)
-        list_w = int(screen_w * ui["list_width_pct"])
-        right_x = list_w
-        right_w = screen_w - list_w
-        from ..render import draw_screen_header, HEADER_DELETE_BG
+        from ..render import (draw_screen_header, HEADER_DELETE_BG,
+                              split_layout)
         header_h = draw_screen_header(surface, self.app, theme, ui,
                                       "MARK FOR DELETE", HEADER_DELETE_BG)
+        content_h = screen_h - legend_h - header_h
+        list_rect, panel_rect = split_layout(
+            screen_w, header_h, content_h, ui["list_width_pct"],
+            ui.get("games_list_side", "left"))
 
         # Reset description scroll if the selection changed. Note we MUST
         # invalidate the cache_key here too - without that, the re-wrap
@@ -187,12 +189,8 @@ class GameListScreen:
             self._image_due_ms = pygame.time.get_ticks() + ui["image_load_debounce_ms"]
             self._last_selection = self.selected
 
-        self._draw_left_panel(surface, theme, ui,
-                              pygame.Rect(0, header_h, list_w,
-                                           screen_h - legend_h - header_h))
-        self._draw_right_panel(surface, theme, ui,
-                               pygame.Rect(right_x, header_h, right_w,
-                                           screen_h - legend_h - header_h))
+        self._draw_left_panel(surface, theme, ui, list_rect)
+        self._draw_right_panel(surface, theme, ui, panel_rect)
         self._draw_legend(surface, theme, ui,
                           pygame.Rect(0, screen_h - legend_h, screen_w, legend_h))
 
@@ -390,9 +388,9 @@ class GameListScreen:
             is_flag = idx in self.flagged
 
             text_color = tuple(theme["text_color"])
-            if is_flag:
-                text_color = tuple(theme["flagged_color"])
-
+            # Marked rows keep normal text color; the badge (a black X on
+            # a light-grey chip) carries the "marked for delete" signal,
+            # so it stays legible whatever font/highlight color is set.
             if is_sel:
                 pygame.draw.rect(
                     surface,
@@ -448,24 +446,24 @@ class GameListScreen:
             display_name = game.name
             x_pad_left = 0
             if is_flag:
-                x_size = max(10, int(font.get_height() * 0.60))
-                x_pad_left = x_size + 10  # space taken by X + gap
-                if is_sel:
-                    x_color = (255, 255, 255)  # white on the red bar
-                else:
-                    x_color = tuple(theme["accent_color"])  # Rocknix red
-                cx = rect.x + pad_x + x_size // 2
-                cy = y + line_h // 2
-                half = x_size // 2
-                stroke = max(3, x_size // 4)
-                pygame.draw.line(surface, x_color,
+                x_size = max(12, int(font.get_height() * 0.66))
+                x_pad_left = x_size + 10  # space taken by chip + gap
+                chip = pygame.Rect(rect.x + pad_x, y + (line_h - x_size) // 2,
+                                   x_size, x_size)
+                # Black X on a light-grey chip - the inverse of the green
+                # plus / yellow question on the fetch screen, and legible
+                # over any highlight or font color.
+                pygame.draw.rect(surface, (210, 210, 210), chip,
+                                 border_radius=3)
+                cx, cy = chip.centerx, chip.centery
+                half = int(x_size * 0.28)
+                stroke = max(2, x_size // 6)
+                pygame.draw.line(surface, (0, 0, 0),
                                  (cx - half, cy - half),
-                                 (cx + half, cy + half),
-                                 stroke)
-                pygame.draw.line(surface, x_color,
+                                 (cx + half, cy + half), stroke)
+                pygame.draw.line(surface, (0, 0, 0),
                                  (cx + half, cy - half),
-                                 (cx - half, cy + half),
-                                 stroke)
+                                 (cx - half, cy + half), stroke)
 
             render_clipped_text(
                 surface,

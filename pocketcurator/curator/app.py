@@ -768,6 +768,11 @@ class App:
         else:
             beh.pop("include_screenshots_folder", None)
             beh.pop("include_media_folder", None)
+
+        # Apply the user's chosen font/highlight colors as overrides on
+        # top of the active theme.
+        from .colors import apply_user_colors
+        apply_user_colors(merged)
         return merged
 
     def save_settings(self) -> None:
@@ -805,6 +810,9 @@ class App:
                 "description_autoscroll_speed_px_per_sec": 18,
                 "image_load_debounce_ms": 120,
                 "fps_cap": 30,
+                "font_color": "Theme Default",
+                "highlight_color": "Theme Default",
+                "games_list_side": "left",
             },
             "behavior": {
                 "deletion_dry_run": False,

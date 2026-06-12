@@ -2,6 +2,48 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.1] - 2026-06-12
+
+### Settings menu
+- Removed Safe Mode (no longer useful now that the workflow is proven).
+- "Delete Scraped Media" renamed to "Delete Scraped Files with ROMs"
+  and moved above Auto-Scroll Description.
+- Restore Gamelist Backup moved to the bottom of the list.
+- Rows are now compact (same height as the delete/fetch game lists),
+  fitting more settings on screen.
+- The list scrolls when it doesn't fit, with up/down arrow indicators
+  showing there's more in that direction; L1/R1 jump to the top/bottom.
+- The bottom hint and legend lines are now pinned and reserved, so they
+  never clip into the list no matter how large the font is set.
+- Legend is in Title Case and now documents L1/R1 Jump.
+
+### New settings
+- **Font Color** - 7 bright colors (white, red, orange, yellow, green,
+  blue, purple) plus Theme Default. Left/Right scroll through swatches
+  (shown as a small color box on the right), wrapping infinitely.
+- **Highlight Color** - 7 darker selection colors (grey, red, orange,
+  yellow, green, blue, purple) plus Theme Default, chosen to keep the
+  bright font colors readable on top. Same swatch + scroll UX.
+- **Swap Games List Side** - Left (current) or Right, which mirrors the
+  whole games-list layout (list on one side, preview/details on the
+  other). Built on a modular split-layout so more arrangements can be
+  added later.
+
+### Marked-row badges (so they survive any color choice)
+- Marked rows now keep the normal text color; a small inverted badge
+  carries the signal: black + on a green chip (fetch, new), black ? on
+  a yellow chip (fetch, already on device), black X on a light-grey
+  chip (delete). These stay legible whatever font/highlight color is
+  selected.
+
+### Status dialog
+- No longer checks for updates itself (Check For Updates already does
+  that). It shows the running version and, if a check has run this
+  session, whether you're up to date / an update is available.
+- Added "Refresh Games List On Exit: Pending / Not Necessary" so you
+  can see at a glance whether your deletions/fetches will be reflected
+  after exit.
+
 ## [1.0.0] - 2026-06-12
 
 First stable release. Everything from the 0.62-0.64 development line

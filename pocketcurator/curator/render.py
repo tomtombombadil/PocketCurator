@@ -315,3 +315,23 @@ def draw_screen_header(surface: pygame.Surface, app, theme, ui,
     surface.blit(label, ((rect.w - label.get_width()) // 2,
                          rect.y + (h - label.get_height()) // 2))
     return h
+
+
+def split_layout(surface_w, content_top, content_h, list_width_pct, side):
+    """Modular two-pane layout for the games-list screens.
+
+    Returns (list_rect, panel_rect) for the given side ("left" or
+    "right"). "left" keeps the historical layout (list on the left,
+    preview/details on the right); "right" mirrors it. Adding a third
+    arrangement later is just another branch here - the screens don't
+    need to know which side they're on.
+    """
+    list_w = int(surface_w * list_width_pct)
+    panel_w = surface_w - list_w
+    if side == "right":
+        panel_rect = pygame.Rect(0, content_top, panel_w, content_h)
+        list_rect = pygame.Rect(panel_w, content_top, list_w, content_h)
+    else:  # "left" (default)
+        list_rect = pygame.Rect(0, content_top, list_w, content_h)
+        panel_rect = pygame.Rect(list_w, content_top, panel_w, content_h)
+    return list_rect, panel_rect

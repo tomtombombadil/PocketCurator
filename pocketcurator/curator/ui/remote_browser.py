@@ -738,7 +738,7 @@ class RemoteBrowserScreen:
         header_h = hdr_font.get_linesize() + 6
         list_w = int(W * ui["list_width_pct"])
         pad = 16
-        max_w = (W - list_w) - 2 * pad
+        max_w = (W - list_w) - 2 * pad   # panel width is the same either side
         max_h = int((H - legend_h - header_h) * 0.70)
         threading.Thread(target=work,
                          args=(self.selected, e, max_w, max_h),
@@ -757,14 +757,13 @@ class RemoteBrowserScreen:
         surface.fill(tuple(theme["background_color"]))
 
         legend_h = max(28, base + 8)
-        list_w = int(W * ui["list_width_pct"])
-        from ..render import draw_screen_header, HEADER_FETCH_BG
+        from ..render import (draw_screen_header, HEADER_FETCH_BG,
+                              split_layout)
         header_h = draw_screen_header(surface, self.app, theme, ui,
                                       "FETCH FROM WebDAV", HEADER_FETCH_BG)
-        list_rect = pygame.Rect(0, header_h, list_w,
-                                H - legend_h - header_h)
-        right_rect = pygame.Rect(list_w, header_h, W - list_w,
-                                 H - legend_h - header_h)
+        list_rect, right_rect = split_layout(
+            W, header_h, H - legend_h - header_h, ui["list_width_pct"],
+            ui.get("games_list_side", "left"))
 
         if self._loading:
             font = self.app.fonts.get(base)
@@ -816,37 +815,45 @@ class RemoteBrowserScreen:
             exists = i in self.flagged_existing
             if i == self.selected:
                 pygame.draw.rect(surface, hi, row)
-            # Marked rows: bright green plus for new games, yellow ?
-            # for games already on the device (decided at mark time).
-            if flagged:
-                fg = EXISTS_YELLOW if exists else FETCH_GREEN
-            else:
-                fg = hi_text if i == self.selected else text_c
+            # Marked rows keep normal text color; an inverted chip
+            # carries the signal so it stays legible under any font or
+            # highlight color: black + on a green chip for new games,
+            # black ? on a yellow chip for games already on the device.
+            fg = hi_text if i == self.selected else text_c
             x = row.x + 8
             if e.is_dir:
                 x += self._draw_folder_icon(surface, x, row, fg) + 8
             elif flagged and exists:
-                qf = font.render("?", True, EXISTS_YELLOW)
-                surface.blit(qf, (x, row.y + 1))
-                x += qf.get_width() + 8
+                x += self._draw_chip(surface, x, row, font, "?",
+                                     EXISTS_YELLOW) + 8
             elif flagged:
-                x += self._draw_plus(surface, x, row, FETCH_GREEN) + 8
+                x += self._draw_chip(surface, x, row, font, "+",
+                                     FETCH_GREEN) + 8
             render_clipped_text(surface, e.name, font, fg,
                                 pygame.Rect(x, row.y + 1,
                                             row.right - x - 8, line_h))
             y += line_h
 
     @staticmethod
-    def _draw_plus(surface, x, row, color) -> int:
-        """A thick plus sign drawn as two crossing bars."""
-        size = max(10, int(row.h * 0.58))
-        size -= size % 2
-        bar = max(3, size // 3)
-        top = row.y + (row.h - size) // 2
-        cx = x + (size - bar) // 2
-        cy = top + (size - bar) // 2
-        pygame.draw.rect(surface, color, pygame.Rect(cx, top, bar, size))
-        pygame.draw.rect(surface, color, pygame.Rect(x, cy, size, bar))
+    def _draw_chip(surface, x, row, font, glyph, color) -> int:
+        """A colored rounded chip with a black glyph - "+" for new, "?"
+        for already-on-device. Black-on-bright stays readable whatever
+        the user picks for font and highlight colors."""
+        size = max(12, int(row.h * 0.66))
+        chip = pygame.Rect(x, row.y + (row.h - size) // 2, size, size)
+        pygame.draw.rect(surface, color, chip, border_radius=3)
+        cx, cy = chip.centerx, chip.centery
+        if glyph == "+":
+            bar = max(2, size // 6)
+            half = int(size * 0.30)
+            pygame.draw.rect(surface, (0, 0, 0),
+                             pygame.Rect(cx - bar // 2, cy - half, bar, half * 2))
+            pygame.draw.rect(surface, (0, 0, 0),
+                             pygame.Rect(cx - half, cy - bar // 2, half * 2, bar))
+        else:  # "?" - render the glyph in black, centered
+            gf = font.render("?", True, (0, 0, 0))
+            surface.blit(gf, (cx - gf.get_width() // 2,
+                              cy - gf.get_height() // 2))
         return size
 
     @staticmethod
