@@ -79,16 +79,50 @@ class App:
         # NOT call pygame.init() (the umbrella), which would also pull in
         # the heavy audio mixer we never use.
         driver = (pygame.display.get_driver() or "").lower()
-        if driver not in ("wayland", "x11"):
+        # On kmsdrm there is no compositor or window manager to deliver
+        # keyboard events, and SDL only grabs TTY keyboard input when the
+        # app owns the active VT - which a PortMaster-launched child of ES
+        # does not. The net effect (SDL issues #2418 / #15166): gamepad
+        # input is seen, keyboard input (incl. gptokeyb's uinput keys) is
+        # NOT. So on non-wayland/x11 drivers we read the gamepad directly
+        # as a joystick and translate its buttons/hat/axes into the same
+        # key events the screens already expect.
+        self._use_joystick = driver not in ("wayland", "x11")
+        self._joysticks = []
+        if self._use_joystick:
             try:
                 pygame.joystick.init()
                 for _ji in range(pygame.joystick.get_count()):
-                    pygame.joystick.Joystick(_ji).init()
-                print(f"[app] {driver}: joystick subsystem up "
-                      f"({pygame.joystick.get_count()} device(s)) for evdev "
-                      f"key input")
+                    j = pygame.joystick.Joystick(_ji)
+                    j.init()
+                    self._joysticks.append(j)
+                print(f"[app] {driver}: joystick input on "
+                      f"({len(self._joysticks)} device(s)); translating pad "
+                      f"-> keys (no compositor for keyboard on this driver)")
             except Exception as _exc:  # noqa: BLE001
                 print(f"[app] joystick init skipped: {_exc}")
+        # SDL standard game-controller button index -> the key the gptk
+        # file would have produced. b0/b1/b2/b3 = A/B/X/Y in SDL's
+        # canonical order (the launcher's diag shows the device's own
+        # a:b1 b:b0 mapping, but pygame.joystick reports SDL-normalized
+        # indices for known pads).
+        self._js_button_key = {
+            0: pygame.K_RETURN,   # A -> Enter
+            1: pygame.K_ESCAPE,   # B -> Esc
+            2: pygame.K_x,        # X
+            3: pygame.K_y,        # Y
+            4: pygame.K_PAGEUP,   # L1
+            5: pygame.K_PAGEDOWN, # R1
+            6: pygame.K_F1,       # Select
+            7: pygame.K_TAB,      # Start
+            9: pygame.K_LEFTBRACKET,   # L2 (digital, where present)
+            10: pygame.K_RIGHTBRACKET, # R2
+        }
+        self._js_hat_keys = {
+            (0, 1): pygame.K_UP, (0, -1): pygame.K_DOWN,
+            (-1, 0): pygame.K_LEFT, (1, 0): pygame.K_RIGHT,
+        }
+        self._js_axis_active = {}   # (axis)->dir for stick-as-dpad edge detect
 
         info = pygame.display.Info()
         disp_w = info.current_w
@@ -120,8 +154,10 @@ class App:
             self._rotation = int(rot_env)
         elif disp_h > disp_w:
             # Portrait framebuffer on a device meant to be held in
-            # landscape -> rotate 90 clockwise for display.
-            self._rotation = 90
+            # landscape. The panels we've seen (RG552) read as 90deg
+            # clockwise, so the content must rotate 90deg COUNTER-
+            # clockwise to come out upright -> 270.
+            self._rotation = 270
         else:
             self._rotation = 0
 
@@ -429,6 +465,60 @@ class App:
             # Splash is a nicety, not a hard requirement.
             print(f"[app] splash render failed: {exc}")
 
+    def _translate_joystick(self, event):
+        """Map a joystick event to zero or more synthetic key events
+        (KEYDOWN/KEYUP) using the same bindings the gptk file defines,
+        so the screens react identically to a real keyboard."""
+        out = []
+        if event.type == pygame.JOYBUTTONDOWN:
+            k = self._js_button_key.get(event.button)
+            if k is not None:
+                out.append(pygame.event.Event(pygame.KEYDOWN, key=k))
+        elif event.type == pygame.JOYBUTTONUP:
+            k = self._js_button_key.get(event.button)
+            if k is not None:
+                out.append(pygame.event.Event(pygame.KEYUP, key=k))
+        elif event.type == pygame.JOYHATMOTION:
+            # Release any previously-held hat directions, then press the
+            # new one(s). Track per-hat so diagonals and releases work.
+            prev = self._js_axis_active.pop(("hat", event.hat), None)
+            if prev is not None:
+                pk = self._js_hat_keys.get(prev)
+                if pk is not None:
+                    out.append(pygame.event.Event(pygame.KEYUP, key=pk))
+            if event.value != (0, 0):
+                nk = self._js_hat_keys.get(event.value)
+                if nk is not None:
+                    out.append(pygame.event.Event(pygame.KEYDOWN, key=nk))
+                    self._js_axis_active[("hat", event.hat)] = event.value
+        elif event.type == pygame.JOYAXISMOTION:
+            # Left stick as d-pad, with a dead zone + edge detection so
+            # we emit one press per threshold crossing, not a stream.
+            if event.axis in (0, 1):
+                thresh = 0.6
+                if event.value <= -thresh:
+                    d = -1
+                elif event.value >= thresh:
+                    d = 1
+                else:
+                    d = 0
+                key_for = {
+                    (0, -1): pygame.K_LEFT, (0, 1): pygame.K_RIGHT,
+                    (1, -1): pygame.K_UP, (1, 1): pygame.K_DOWN,
+                }
+                prev = self._js_axis_active.get(("axis", event.axis), 0)
+                if d != prev:
+                    if prev != 0:
+                        pk = key_for.get((event.axis, prev))
+                        if pk is not None:
+                            out.append(pygame.event.Event(pygame.KEYUP, key=pk))
+                    if d != 0:
+                        nk = key_for.get((event.axis, d))
+                        if nk is not None:
+                            out.append(pygame.event.Event(pygame.KEYDOWN, key=nk))
+                    self._js_axis_active[("axis", event.axis)] = d
+        return out
+
     def _present(self) -> None:
         """Put the logical surface on the real display, rotating if the
         panel needs it, then flip. When no rotation is in effect the
@@ -483,6 +573,27 @@ class App:
                     self._swallowed_keys.discard(event.key)
                 else:
                     self._is_repeat_event = False
+
+                # Translate gamepad input into key events on drivers
+                # where SDL won't deliver the keyboard (kmsdrm). Each
+                # synthesized KEYDOWN/KEYUP is fed through the same path
+                # as a real key, so _held_keys / repeat logic still work.
+                if self._use_joystick:
+                    for synth in self._translate_joystick(event):
+                        if synth.type == pygame.KEYDOWN:
+                            if synth.key in self._swallowed_keys:
+                                continue
+                            self._is_repeat_event = synth.key in self._held_keys
+                            self._held_keys.add(synth.key)
+                        elif synth.type == pygame.KEYUP:
+                            self._is_repeat_event = False
+                            self._held_keys.discard(synth.key)
+                            self._swallowed_keys.discard(synth.key)
+                        self._screens[-1].handle_event(synth)
+                        if self._quit:
+                            break
+                    if self._quit:
+                        break
 
                 # Always forward to the top of the stack
                 top = self._screens[-1]

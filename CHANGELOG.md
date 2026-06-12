@@ -2,6 +2,35 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.64.4] - 2026-06-11
+
+### AmberELEC controls + rotation direction
+Follow-up to v0.64.3's display work on the RG552.
+
+- **Controls now work on kmsdrm.** v0.64.3's joystick init confirmed
+  the gamepad is visible, but the buttons were still dead because of a
+  known SDL limitation (libsdl-org #2418 / #15166): on kmsdrm SDL only
+  grabs keyboard input when the app owns the active VT, which a
+  PortMaster-launched child of EmulationStation does not - so SDL sees
+  the GAMEPAD but never the keyboard, including gptokeyb's uinput keys.
+  Pocket Curator now reads the gamepad directly as a joystick on
+  kmsdrm and translates its buttons, d-pad/hat, and analog stick into
+  the same key events the screens already use (A->Enter, B->Esc,
+  X/Y, L1/R1->PgUp/PgDn, L2/R2->[/], Select->settings, Start, d-pad ->
+  arrows). Wayland/X11 firmwares (ROCKNIX, Knulli) are untouched -
+  their compositor still delivers the keyboard and the joystick path
+  stays off, so there's no double input.
+- **Rotation corrected.** v0.64.3 rotated the RG552 the wrong way
+  (ended up 180deg off). The portrait-panel default is now 270deg,
+  which brings the UI upright. PC_ROTATE still overrides per device if
+  a particular panel differs.
+
+### Note for AmberELEC testers
+With this build the RG552 should be upright AND controllable. If the
+angle is still off, set PC_ROTATE (0/90/180/270) in the launcher; if a
+button is mismapped on a specific pad, that's the joystick button
+index table in app.py.
+
 ## [0.64.3] - 2026-06-11
 
 ### AmberELEC display works - now upright, with working controls
