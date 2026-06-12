@@ -2,6 +2,28 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.2] - 2026-06-12
+
+### Fixed: doubled controller input on Knulli (and any system-keyboard firmware)
+v0.64.4/v0.64.5 added gamepad-to-key translation for AmberELEC, gated
+on "any non-wayland/x11 SDL driver." That was too broad: Knulli's
+system pygame reports its driver as kmsdrm but DOES deliver gptokeyb's
+keyboard to SDL, so both the real key AND the translated key fired -
+doubling every press. Symptoms: the d-pad skipped every other item,
+Left/Right jumped two systems, A entered a list and immediately exited,
+Status was skipped in Settings, and the app couldn't be exited
+normally.
+
+- The launcher now sets PC_PAD_INPUT explicitly, and only enables
+  gamepad translation on our own pcSDL kmsdrm path (AmberELEC), where
+  SDL genuinely cannot see the keyboard. Every other firmware
+  (Knulli/ROCKNIX via the compositor, dArkOS via system-SDL) keeps its
+  normal single keyboard input. The app honors the flag, falling back
+  to the old driver heuristic only when launched without it (dev runs).
+
+This restores correct single-step navigation on Knulli and ROCKNIX
+while keeping AmberELEC's controller support working.
+
 ## [1.0.1] - 2026-06-12
 
 ### Settings menu

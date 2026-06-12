@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.1
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.2
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -542,6 +542,16 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   if [ -n "$WORKING_ENV" ]; then
     export $WORKING_ENV
   fi
+  # Gamepad-as-keyboard translation is needed ONLY where SDL can't see
+  # gptokeyb's keyboard - i.e. our own pcSDL kmsdrm path (AmberELEC),
+  # where the app owns no TTY and there's no compositor. On every other
+  # firmware (Knulli/ROCKNIX via wayland, dArkOS via system-SDL kmsdrm)
+  # gptokeyb's keys DO reach SDL, so the translation would DOUBLE every
+  # input. Gate it on the pcSDL preload, which only AmberELEC uses.
+  case "${WORKING_ENV:-}" in
+    *pcsdl*) export PC_PAD_INPUT=1 ;;
+    *) export PC_PAD_INPUT=0 ;;
+  esac
   pc_stage "launching the app"
 # Display rotation override (0/90/180/270). Unset = the app auto-rotates
 # a portrait framebuffer (e.g. the RG552's 1152x1920 panel) to landscape.

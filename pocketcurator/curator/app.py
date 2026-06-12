@@ -79,15 +79,26 @@ class App:
         # NOT call pygame.init() (the umbrella), which would also pull in
         # the heavy audio mixer we never use.
         driver = (pygame.display.get_driver() or "").lower()
-        # On kmsdrm there is no compositor or window manager to deliver
-        # keyboard events, and SDL only grabs TTY keyboard input when the
-        # app owns the active VT - which a PortMaster-launched child of ES
-        # does not. The net effect (SDL issues #2418 / #15166): gamepad
-        # input is seen, keyboard input (incl. gptokeyb's uinput keys) is
-        # NOT. So on non-wayland/x11 drivers we read the gamepad directly
-        # as a joystick and translate its buttons/hat/axes into the same
-        # key events the screens already expect.
-        self._use_joystick = driver not in ("wayland", "x11")
+        # Whether to read the gamepad ourselves and translate it to keys.
+        #
+        # This is needed ONLY where SDL can't see gptokeyb's keyboard:
+        # our own pcSDL kmsdrm path on AmberELEC, where the app owns no
+        # active VT and there's no compositor (SDL #2418 / #15166 -
+        # gamepad seen, keyboard not). EVERYWHERE ELSE gptokeyb's keys
+        # reach SDL normally, and translating would DOUBLE every press
+        # (Knulli reports its driver as kmsdrm but DOES deliver the
+        # keyboard - so the old "any non-wayland/x11 driver" heuristic
+        # wrongly fired there and made every d-pad step skip two).
+        #
+        # The launcher sets PC_PAD_INPUT explicitly (1 only on the pcSDL
+        # path). Honor it; fall back to the driver heuristic only when
+        # the launcher didn't set it at all (e.g. a direct dev run).
+        import os as _os
+        pad_env = _os.environ.get("PC_PAD_INPUT")
+        if pad_env in ("0", "1"):
+            self._use_joystick = pad_env == "1"
+        else:
+            self._use_joystick = driver not in ("wayland", "x11")
         self._joysticks = []
         self._controllers = []
         self._use_controller = False
