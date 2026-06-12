@@ -47,6 +47,7 @@ Pocket Curator was made for Rocknix, plain and simple. But I have enough other h
    - Knulli Scarab 2026-05-11 or later - RECOMMENDED
    - dArkOS 06072026 or later (only tested on R36S)
    - Batocera v39 2024-03-05 (only tested on RG552)
+   - AmberELEC 2025-xx-xx or later (only tested on RG552)
    
 Be sure to update your PortMaster installation as well as install the latest version of your firmware. Without a recent version of both (firmware and PortMaster) Pocket Curator will likely fail. Previous versions of firmwares listed above are untested.
 
@@ -54,7 +55,6 @@ Be sure to update your PortMaster installation as well as install the latest ver
 
 It is VERY unlikely that I will do any development for the below firmwares or any unlisted firmwares:
 
-   - AmberELEC 2023-02-03 (only tested on RG552) Sorry, I thought this one was working. It is not, and likely never will.
    - ArkOS - untested and unlikely to work. This OS is no longer in development.
    - EmuELEC - untested... it might work
    - GarlicOS - untested and unlikely to work

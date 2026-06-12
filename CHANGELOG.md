@@ -2,6 +2,54 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.0] - 2026-06-12
+
+First stable release. Everything from the 0.62-0.64 development line
+is consolidated here, and AmberELEC is now a fully supported firmware.
+
+### Headline
+- **AmberELEC support, for real.** The RG552 now runs Pocket Curator
+  end to end: upright display via our own KMSDRM-enabled SDL build
+  (libs.aarch64/pcsdl, SDL 2.28.4 built against an old-enough glibc),
+  correctly-mapped controls through SDL's GameController API, and
+  working fetch/delete/metadata. The earlier belief that AmberELEC
+  "never worked and likely never would" has been overtaken by events.
+- **Fetch from WebDAV.** Press Y on a system to browse a WebDAV server
+  (saved, scanned on the LAN, or entered by address), mark games the
+  same way you mark deletions, and copy them - with scrapings and full
+  gamelist metadata injected into the destination, under strict
+  backup-first / sorted-insertion / atomic-write rules with a Settings
+  restore option.
+
+### Display & input
+- Own KMSDRM SDL build for firmwares whose system SDL is too old to
+  preload and whose pygame SDL lacks kmsdrm; probed AmberELEC-first.
+- Portrait-framebuffer auto-rotation (RG552 -> 270deg; PC_ROTATE
+  overrides).
+- Gamepad input via SDL GameController API on kmsdrm (standardized
+  A/B/X/Y/d-pad from the firmware's own mapping), with raw-joystick
+  fallback; Wayland/X11 keep compositor keyboard input.
+- Firmware-preferred display probe ladder with a per-device probe
+  cache; clean abort-to-ES (no wedge) when no driver works.
+
+### Fetch experience
+- Fetch screens mirror the deletion screens: same layout, headers
+  (FETCH FROM WebDAV / MARK FOR DELETE), hold-A mass-mark, wrap-on-tap,
+  upscaled previews, autoscrolling descriptions with L2/R2.
+- Mark-time existence check (green + for new, yellow ? for already on
+  device); Overwrite/Skip confirmation with per-option sizes, free
+  space, and a fit check.
+- One session queue with per-job destinations; enqueue more mid-copy.
+- ~60-group cross-firmware folder alias matrix (megadrive/genesis,
+  jaguar/atarijaguar, etc.) with exact-first two-pass resolution;
+  empty-but-present system folders are valid destinations.
+- After-copy ATTENTION notice; region shown in proper caps.
+
+### Reliability
+- WebDAV read-only client with one-retry reconnect and a 15s timeout.
+- In-app updater, one-file installer, precompiled bytecode, startup
+  timing logs.
+
 ## [0.64.5] - 2026-06-11
 
 ### AmberELEC controls mapped correctly
