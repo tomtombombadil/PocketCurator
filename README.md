@@ -1,8 +1,10 @@
 # Pocket Curator
 
-**An on-device ROM and scraped-media cleanup tool for retro handhelds.**
-Browse your installed systems and games in an Emulation-Station-style interface, then mark and delete ROMs together with their scraped files. No PC, no SSH, no SAMBA, no WiFi, no SD card swapping. 
-(* installation requires Internet connection and may require a PC, after you install, Internet connectivity is unnecessary)
+**An on-device ROM and scraped-media cleanup and download tool for retro handhelds.**
+That's right! It says DOWNLOAD. Pocket Curator not only helps you clean up your ROMs collection, now you can download ROMs direct from your device! (WebDAV support added for v1.0)
+Curate your device's ROMs in an Emulation Station-style interface. See the screenshots, read the description, see the stars rating and genre and region info. Make decisions based on more than just the game title. You can mark and delete ROMs in an easy to use familiar interface. No extra button pushes. No menus to scroll through. You can also connect to a WebDAV server and copy ROMs from it to your device... WITH scraped media, manuals, and metadata! All directly on your device. No removing the SD card. No console commands. No Samba share. No hassles.
+   * installation requires Internet connection and may require a PC, after you install, Internet connectivity is unnecessary.
+   ** copying ROMs from a WebDAV server obviously requires WiFi
 
 ![Splash](pocketcurator/assets/splash.jpg)
 ![Systems carousel](pocketcurator/assets/Screenshot-Systems.jpg)
@@ -10,9 +12,13 @@ Browse your installed systems and games in an Emulation-Station-style interface,
 
 ## Why This Exists
 
-Let's face it, unless you're one of those hyper-organized people with a finely curated collection of ROMs, you probably have THOUSANDS of ROMs you don't want or need. Sure, it feels good to have EVERY SINGLE ROM EVER, but after the initial shine wears off, you realize that you need to trim the collection down to what works for YOU. Pocket Curator is here to help with that.
+Because weeding your ROMs collection on your device is a pain in the rear. And getting ROMs onto your device can be a challenge too. Pocket Curator makes it MUCH easier.
 
-Pocket Curator helps you:
+You probably have THOUSANDS of ROMs. No one can remember what they all are by filename. (and don't get me started on those MAME filenames!) Making decisions about ROMs needs metadata, screenshots, visuals. Pocket Curator gives you that. Whether you're deleting unneeded ROMs from your device or copying more ROMs to your device, Pocket Curator has you covered.
+
+Pocket Curator as TWO 'modes': Delete and Fetch
+
+Delete Mode helps you:
    - Trim the fat from your collection right on the device
    - Gives you a visual way to remove ROMs you don't want
    - Shows the ROM's screenshot and description and details letting you make an informed decision
@@ -20,24 +26,37 @@ Pocket Curator helps you:
    - Multiple deletes are EASY! No faffing about through menus. No wearing your thumbs out.
    - Mark as many ROMs for deletion as you want, then with two button presses delete the all the marked ROMs and their scraped files.
 
-How does deleting ROMs work in Pocket Curator?
+Fetch Mode helps you:
+   - Connect to a server with ROMs and copy them to your device
+   - Shows you the screenshot and metadata of the ROMs you're looking to copy (assuming the server you connect to has the ROMs properly scraped!)
+   - Copies the metadata and screenshot along with the ROMs (Pocket Curator calls them 'scrapings')
+   - Finds the right folder for you, no scrolling through that long systems list, placing ROMs where they belong
+   - Lets you copy 1 or a thousand files at once, showing a progress bar and a count
+   - Copies files quickly at full HTTP speeds - no Samba overhead
+   - Refreshes the games list for you, saving you faffing about in menus
+
+**How does deleting ROMs work in Pocket Curator?**
 Simple. You're in a visual interface that looks just like Emulation Station. (sorry, your themes aren't implemented) You scroll through the games list, just like you do in Emulation Station. Press A to mark a game to be deleted. Keep scrolling and marking. When you're done marking, press X to view a list of what you're about to delete and how much space you'll get back. Press X again to confirm the delete and the games and their scraped files are deleted. When you exit Pocket Curator, it automatically refreshes your games list. Easy, fast, and efficient!
 
-Sure, there are tools to weed ROM collections on your PC. And if that's your thing, you do you. Enjoy. If that's not your thing, then Pocket Curator is the answer. Frankly: I find weeding on my PC to be a real chore. I'm far more likely to do a little cleanup here and there, especially when I can do it right on the handheld. Pocket Curator will lets you do that.
+**How does fetching ROMs work in Pocket Curator?**
+Simple. From the System Selection screen, scroll to the system you want to copy ROMs to, then press the Y button. That opens a dialog allowing you to search the network for a WebDAV server or to enter your own server address. It even has some extra buttons to help you enter common IP addresses, like 1 button for 192.168. and 1 button for :5005 (common WebDAV port). Once you either select the server from the search or enter your own, it takes you right into the correct folder for the system you're looking to copy ROMs for. For example: if you're on the Game Boy Advance system on the system selection screen, press Y, enter your server, it connects and takes you into the roms\gba folder. When you mark games and copy them, it places those games in your device's roms/gba folder. When you exit Pocket Curator, it automatically runs Emulation Station's games list refresh routine, updating your games list and your new ROMs show up scraped and ready to go. (assuming the ROMs had scraped files on the WebDAV server).
+
+Pocket Curator tries to be smart when you're copying games. When you mark a game to be copied, it checks your device to see if you already have it. If you do, it marks it with a ? and makes it yellow. If you don't already have it, it marks it with a + and makes it green. When you go ahead and tell it to copy (press X) it tells you if you've got duplicates selected and asks if you want to skip them. It also shows how much space you're going to take up with these copied games and how much you have left on your device, smartly not letting you try to copy more than your card can take.
 
 Pocket Curator makes a couple assumptions about you and your ROM collection:
    - You already scraped all your ROMs (you might have gotten them that way from a vendor)
    - You have a bunch of ROMs that are just cluttering up your games lists preventing you from focusing on and playing the real gems
    - You just can't be bothered swapping your sd card back to your PC and installing/configuring programs to weed the collection over there
    - You just want an easier way to delete ROMs right from Emulation Station
-
-Most handheld firmwares let you delete a game from the menu. Frankly that process takes way too many button presses. It usually involves holding a button, scrolling through a menu, and selecting that item from the menu. That doesn't sound like a lot, and it isn't for one or two games. But when you're trying to weed your collection, or trying to make room for another large game, that's where Pocket Curator comes to the rescue!
-
-Pocket Curator is a powerful deletion tool. You can even delete whole systems! Tired of seeing Amstrad CPC in your systems list? (How'd it even get there? LOL) One press of X at the systems carousel and a confirmation, and it will delete all the games and scraped media for that whole game system! Be careful with this one. There is no UNDELETE!
+   - You have a collection of ROMs on a PC or a NAS somewhere, and they are already scraped and sitting in folders just like you would have them on your device
 
 ## What Gets Deleted
 
 For each marked game, Pocket Curator removes the ROM/zip file plus the media its `gamelist.xml` entry explicitly references — `<image>`, `<thumbnail>`, `<marquee>`, `<video>`, and `<manual>`. Only files named in the gamelist entry are touched.
+
+## What Gets Copied (Fetched)
+
+For each copied ROM, Pocket Curator checks the WebDAV server for gameslist.xml files. If it finds one in the system folder you're copying from, it will use the information there to find the scraped files that go with that ROM, and it will include the metadata that goes with that ROM. Including: screenshots, descriptions, ratings, region, genres, manuals, and probably more I can't think of right now.
 
 ## Targeted Firmwares
 
@@ -49,7 +68,7 @@ Pocket Curator was made for Rocknix, plain and simple. But I have enough other h
    - Batocera v39 2024-03-05 (only tested on RG552)
    - AmberELEC 2023-02-03 (last version, no updates since, only tested on RG552)
    
-Be sure to update your PortMaster installation as well as install the latest version of your firmware. Without a recent version of both (firmware and PortMaster) Pocket Curator will likely fail. Previous versions of firmwares listed above are untested.
+**Be sure to update your PortMaster installation as well as install the latest version of your firmware.** Without a recent version of both (firmware and PortMaster) Pocket Curator will likely fail. Previous versions of firmwares listed above are untested.
 
 ## Unsupported Firmwares
 
@@ -116,11 +135,11 @@ I see no reason Pocket Curator would NOT work on any handheld that is supported 
      - up to date PortMaster
      - at least ONE Port installed with PortMaster (or Ports won't show as a system in some firmwares)
      - a good connection to the Internet for your handheld (WiFi or even via USB tethering)
- 2) Download the PocketCurator.Installer.sh from most recent release page. https://github.com/tomtombombadil/PocketCurator/releases
- 3) Copy PocketCurator.Installer.sh to the ports folder on your SD card. (You can do this via SSH, SCP, SAMBA, or simply remove the SD card and put it in your PC)
- 4) From the Main Menu in Emulation Station, select GAME SETTINGS and UPDATE GAMESLISTS. This will refresh the list of your games, and make PocketCurator.Installer appear on your list of Ports.
- 5) Go into the Ports system in Emulation Station, and highlight PocketCurator.Installer and press A to run it.
- 6) PortMaster will show some installation messages and install the latest release of Pocket Curator. When it finishes, Emulation Station will refresh your gameslist again.
+ 2) Download the **`PocketCurator.Installer.sh`** from most recent release page. https://github.com/tomtombombadil/PocketCurator/releases
+ 3) Copy **`PocketCurator.Installer.sh`** to the **`roms/ports`** folder on your SD card. (You can do this via SSH, SCP, SAMBA, or simply remove the SD card and put it in your PC)
+ 4) From the Main Menu in Emulation Station, select GAME SETTINGS and UPDATE GAMESLISTS. This will refresh the list of your games, and make **`PocketCurator.Installer`** appear on your list of Ports.
+ 5) Go into the Ports system in Emulation Station, and highlight **`PocketCurator.Installer`** and press A to run it.
+ 6) PortMaster will connect to this github repository (via WiFi), show some installation messages, and install the latest release of Pocket Curator. When it finishes, Emulation Station will refresh your gameslist again.
 
 That's it! Easy peasy lemon squeezy. ;)
 
@@ -128,12 +147,13 @@ That's it! Easy peasy lemon squeezy. ;)
 
 **Systems carousel:**
    - Left/Right - scroll through your game systems
-   - A - go to games list for that system
-   - X - delete that game system (it goes to a confirmation dialog, it won't delete anything on an first accidental press)
-   - B - exit Pocket Curator (offers a confirmation - press B again to exit)
-   - Select - Settings
+   - A - Enter Delete Mode for the system you have selected
+   - B - Exit Pocket Curator (offers a confirmation - press B again to exit any other button to not exit)
+   - X - Delete that entire game system's ROMs!!! (it goes to a confirmation dialog, it won't delete anything on a first accidental press)
+   - Y - Enter Fetch Mode - so you can copy ROMs to your device
+   - Select - Settings Menu (you can auto-update Pocket Curator from here, change the font size, and more)
 
-**Games list:**
+**Delete Mode Games list:**
    - Up/Down - scroll through your games
    - Left/Right - go to previous/next system's games list
    - A - mark/unmark a game for deletion (hold to mark lots of games at once!)
@@ -144,24 +164,47 @@ That's it! Easy peasy lemon squeezy. ;)
    - L2/R2 - scroll game description
    - Select - Settings
 
+**Fetch Mode Games List**
+   - Up/Down - scroll through your games
+   - A - mark/unmark a game to be copied (hold to mark lots of games at once!)
+   - B - move UP in WebDAV server's folder tree / cancel action
+   - X - copy marked games
+   - Y - open alphabet, select letter to jump to that letter in the games list
+   - L1/R1 - PgUp/PgDn in your games list
+   - L2/R2 - scroll game description
+   - Select - Settings
+
 ## Settings
 
 Pressing Select will take you to the Pocket Curator Settings screen. These settings are available:
    - Update Pocket Curator - if you're connected to the Internet and your clock is set properly, it will check this GitHub repo for the latest version and install it for you
+   - Status - shows your current version, where your ROMs are located, the detected firmware version, and free space on your SD card
+   - Restore Games List Backup - any time Pocket Curator alters your games list (like when fetching ROMs and injecting metadata) it backs up the originals, just in case!
    - Font Size - changes the size of the font in Pocket Curator.
    - Auto-scroll description - enabling this will cause the game descriptions on the games list to scroll automatically up and down
    - Safe Mode - enabling this will cause Pocket Curator to NOT delete anything! You can use this to test it out without fear.
    - Delete Scraped Media - this is enabled by default, turning it off will cause Pocket Curator to ONLY delete the game ROM/ZIP file. It will NOT delete the scraped files for that game.
-   - Rating Display - two options here Text & Stars. It controls which appears in games list display for the rating of the game: stars or a number.
-   - About Pocket Curator - shows some status information about what Pocket Curator knows about your handheld
+   - Rating Display - two options here Text or Stars. It controls which appears in games list display for the rating of the game: stars or a number.
 
-The Settings screen also shows a line of help text for the selected setting, and a line of help text for controls.
-
-Settings persist in `pocketcurator/settings.json`.
+The Settings screen also shows a line of help text for the selected setting, and a line of help text for controls. Settings persist in `pocketcurator/settings.json`.
 
 ## System Logos
 
 Pocket Curator ships **no** system logos of its own; it reads them from your installed themes the way EmulationStation does (at least MOST of the time!) If Pocket Curator can't find your theme's system logos it will fall back to the Rocknix/Knulli defaults. Pocket Curator also tries to determine your region so it can give you the correct system logos (for example: SNES for North America, and Super Famicom for Japan)
+
+## WebDAV Servers
+
+Pocket Curator now connects to WebDAV servers. Why WebDAV? Because its a simple protocol supported by just about everything. It's quick and easy, and it doesn't require complex authentication. I can't give instructions for every scenario out there, but here's what I see as THE most common situation: your ROM collection is stored on your computer. It doesn't matter if it is MacOS, Linux, or Windows. You can setup a WebDAV server with 1 simple command. First, go to the RCLONE repository here on github: https://github.com/rclone/rclone/releases and download RCLONE for your OS. Install it. (The install instructions are over there on that repository.) Once installed you start your server whenever you need to with one simple command. Here's the one I use for mine:
+
+**`rclone serve webdav "C:\My\Folder\Where\My\ROMs\Are" --addr :5005 --read-only`**
+
+That starts the WebDAV server and points it to my ROMs collection. I also does two VERY important things: it sets what port the WebDAV server communicates on, and it sets the server to READ-ONLY. That means no one can delete your ROMs or do nasty things to your PC. All they can do is copy files.
+
+Next we have to talk about how to organize your ROMs in that folder you pointed to. Pocket Curator ASSUMES (I know, I know, ass-u-me...) that your ROMs are stored in the same type of folder tree as they are on your device. Some allowances are made for the slight differences between Batocera, Knulli, Rocknix, dArkOS, and AmberELEC. But the point is: you should have them stored in folders named like the system folders on your sd card. (In other words: gba for Game Boy Advance, nes for Nintendo Entertainment System, mame for MAME, etc.) Pocket Curator will try to guess when there are more than one option For example: is it tg16 or pcengine? Is it genesis or megadrive?
+
+Chances are, you already have your ROMs sorted into folders like this with the scraped files and gameslist.xml files already because this is where you copy your files onto your sd card from. So if that's the case, you're ready to go! Point rclone at that roms folder and your WebDAV server is ready for Pocket Curator to copy games like a champ!
+
+NOTE: for the scraped files that go with a ROM, Pocket Curator relies on the gameslist.xml file in that folder on your server. If there isn't one there, Pocket Curator won't know where to find the files and won't copy them.
 
 ## Troubleshooting
 
