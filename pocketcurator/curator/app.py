@@ -89,18 +89,52 @@ class App:
         # key events the screens already expect.
         self._use_joystick = driver not in ("wayland", "x11")
         self._joysticks = []
+        self._controllers = []
+        self._use_controller = False
         if self._use_joystick:
+            # Prefer the GameController API: it applies the device's SDL
+            # mapping (exported as SDL_GAMECONTROLLERCONFIG by the
+            # launcher) so A/B/X/Y and the d-pad come out STANDARDIZED,
+            # regardless of the pad's raw evdev button/axis order. Raw
+            # joystick indices are device-specific and were the cause of
+            # the A/B swap + dead d-pad on the RG552. Fall back to raw
+            # joystick translation only if no controller mapping exists.
             try:
-                pygame.joystick.init()
-                for _ji in range(pygame.joystick.get_count()):
-                    j = pygame.joystick.Joystick(_ji)
-                    j.init()
-                    self._joysticks.append(j)
-                print(f"[app] {driver}: joystick input on "
-                      f"({len(self._joysticks)} device(s)); translating pad "
-                      f"-> keys (no compositor for keyboard on this driver)")
+                from pygame._sdl2 import controller as _sdl_controller
+                pygame.joystick.init()        # makes devices enumerable
+                _sdl_controller.init()
+                count = pygame.joystick.get_count()
+                for _ci in range(count):
+                    try:
+                        if _sdl_controller.is_controller(_ci):
+                            c = _sdl_controller.Controller(_ci)
+                            c.init() if hasattr(c, "init") else None
+                            self._controllers.append(c)
+                    except Exception:  # noqa: BLE001
+                        continue
+                if self._controllers:
+                    self._use_controller = True
+                    print(f"[app] {driver}: game controller input on "
+                          f"({len(self._controllers)} device(s)); "
+                          f"standardized A/B/X/Y/d-pad via SDL mapping")
+                else:
+                    print(f"[app] {driver}: {count} joystick(s) but no SDL "
+                          f"controller mapping; using raw joystick")
             except Exception as _exc:  # noqa: BLE001
-                print(f"[app] joystick init skipped: {_exc}")
+                print(f"[app] controller API unavailable ({_exc}); "
+                      f"falling back to raw joystick")
+            if not self._use_controller:
+                try:
+                    pygame.joystick.init()
+                    for _ji in range(pygame.joystick.get_count()):
+                        j = pygame.joystick.Joystick(_ji)
+                        j.init()
+                        self._joysticks.append(j)
+                    print(f"[app] {driver}: raw joystick input on "
+                          f"({len(self._joysticks)} device(s)); translating "
+                          f"pad -> keys")
+                except Exception as _exc:  # noqa: BLE001
+                    print(f"[app] joystick init skipped: {_exc}")
         # SDL standard game-controller button index -> the key the gptk
         # file would have produced. b0/b1/b2/b3 = A/B/X/Y in SDL's
         # canonical order (the launcher's diag shows the device's own
@@ -123,6 +157,33 @@ class App:
             (-1, 0): pygame.K_LEFT, (1, 0): pygame.K_RIGHT,
         }
         self._js_axis_active = {}   # (axis)->dir for stick-as-dpad edge detect
+        # GameController standardized button/axis -> key. These constants
+        # are device-independent (SDL maps each pad to them).
+        import pygame.constants as _pc
+        self._con_button_key = {
+            getattr(_pc, "CONTROLLER_BUTTON_A", 0): pygame.K_RETURN,
+            getattr(_pc, "CONTROLLER_BUTTON_B", 1): pygame.K_ESCAPE,
+            getattr(_pc, "CONTROLLER_BUTTON_X", 2): pygame.K_x,
+            getattr(_pc, "CONTROLLER_BUTTON_Y", 3): pygame.K_y,
+            getattr(_pc, "CONTROLLER_BUTTON_LEFTSHOULDER", 9): pygame.K_PAGEUP,
+            getattr(_pc, "CONTROLLER_BUTTON_RIGHTSHOULDER", 10): pygame.K_PAGEDOWN,
+            getattr(_pc, "CONTROLLER_BUTTON_BACK", 4): pygame.K_F1,    # Select
+            getattr(_pc, "CONTROLLER_BUTTON_START", 6): pygame.K_TAB,
+            getattr(_pc, "CONTROLLER_BUTTON_DPAD_UP", 11): pygame.K_UP,
+            getattr(_pc, "CONTROLLER_BUTTON_DPAD_DOWN", 12): pygame.K_DOWN,
+            getattr(_pc, "CONTROLLER_BUTTON_DPAD_LEFT", 13): pygame.K_LEFT,
+            getattr(_pc, "CONTROLLER_BUTTON_DPAD_RIGHT", 14): pygame.K_RIGHT,
+        }
+        # Triggers (L2/R2) arrive as axes on the controller API.
+        self._con_trig_axis = {
+            getattr(_pc, "CONTROLLER_AXIS_TRIGGERLEFT", 4): pygame.K_LEFTBRACKET,
+            getattr(_pc, "CONTROLLER_AXIS_TRIGGERRIGHT", 5): pygame.K_RIGHTBRACKET,
+        }
+        self._con_stick_axis = {
+            getattr(_pc, "CONTROLLER_AXIS_LEFTX", 0): ("x",),
+            getattr(_pc, "CONTROLLER_AXIS_LEFTY", 1): ("y",),
+        }
+        self._con_active = {}   # edge state for trigger/stick-as-dpad
 
         info = pygame.display.Info()
         disp_w = info.current_w
@@ -465,6 +526,52 @@ class App:
             # Splash is a nicety, not a hard requirement.
             print(f"[app] splash render failed: {exc}")
 
+    def _translate_controller(self, event):
+        """Map standardized GameController events to key events. Button
+        and d-pad come through CONTROLLERBUTTONDOWN/UP with device-
+        independent indices; triggers and the left stick come through
+        CONTROLLERAXISMOTION with edge detection."""
+        out = []
+        if event.type == pygame.CONTROLLERBUTTONDOWN:
+            k = self._con_button_key.get(event.button)
+            if k is not None:
+                out.append(pygame.event.Event(pygame.KEYDOWN, key=k))
+        elif event.type == pygame.CONTROLLERBUTTONUP:
+            k = self._con_button_key.get(event.button)
+            if k is not None:
+                out.append(pygame.event.Event(pygame.KEYUP, key=k))
+        elif event.type == pygame.CONTROLLERAXISMOTION:
+            ax = event.axis
+            val = event.value / 32768.0 if abs(event.value) > 1 else event.value
+            if ax in self._con_trig_axis:
+                k = self._con_trig_axis[ax]
+                pressed = val >= 0.5
+                was = self._con_active.get(("trig", ax), False)
+                if pressed != was:
+                    out.append(pygame.event.Event(
+                        pygame.KEYDOWN if pressed else pygame.KEYUP, key=k))
+                    self._con_active[("trig", ax)] = pressed
+            elif ax in self._con_stick_axis:
+                thresh = 0.6
+                d = -1 if val <= -thresh else (1 if val >= thresh else 0)
+                key_for = {
+                    ("x", -1): pygame.K_LEFT, ("x", 1): pygame.K_RIGHT,
+                    ("y", -1): pygame.K_UP, ("y", 1): pygame.K_DOWN,
+                }
+                kind = self._con_stick_axis[ax][0]
+                prev = self._con_active.get(("stick", ax), 0)
+                if d != prev:
+                    if prev != 0:
+                        pk = key_for.get((kind, prev))
+                        if pk is not None:
+                            out.append(pygame.event.Event(pygame.KEYUP, key=pk))
+                    if d != 0:
+                        nk = key_for.get((kind, d))
+                        if nk is not None:
+                            out.append(pygame.event.Event(pygame.KEYDOWN, key=nk))
+                    self._con_active[("stick", ax)] = d
+        return out
+
     def _translate_joystick(self, event):
         """Map a joystick event to zero or more synthetic key events
         (KEYDOWN/KEYUP) using the same bindings the gptk file defines,
@@ -579,7 +686,10 @@ class App:
                 # synthesized KEYDOWN/KEYUP is fed through the same path
                 # as a real key, so _held_keys / repeat logic still work.
                 if self._use_joystick:
-                    for synth in self._translate_joystick(event):
+                    synths = (self._translate_controller(event)
+                              if self._use_controller
+                              else self._translate_joystick(event))
+                    for synth in synths:
                         if synth.type == pygame.KEYDOWN:
                             if synth.key in self._swallowed_keys:
                                 continue

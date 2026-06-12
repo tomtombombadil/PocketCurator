@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.64.4
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.64.5
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -373,6 +373,12 @@ if [ -n "${sdl_controllerconfig:-}" ]; then
   echo "[Pocket Curator] SDL face-button map (a/b/x/y) for each controller:"
   printf '%s\n' "$sdl_controllerconfig" | tr ',' '\n' \
     | grep -E '^(platform|guid|[abxy]):' | sed 's/^/[Pocket Curator]   /'
+  # Hand the device's own SDL gamecontroller mapping to the app, so
+  # pygame's GameController API labels A/B/X/Y and the d-pad correctly
+  # regardless of the pad's raw evdev button/axis order. This is what
+  # makes the kmsdrm joystick-translation path map buttons right on
+  # devices like the RG552 (GO-Super Gamepad).
+  export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 else
   echo "[Pocket Curator] sdl_controllerconfig is unset"
 fi

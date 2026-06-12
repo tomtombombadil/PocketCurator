@@ -2,6 +2,35 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.64.5] - 2026-06-11
+
+### AmberELEC controls mapped correctly
+v0.64.4 got input flowing on the RG552 but mapped it from RAW joystick
+indices, which are device-specific: A/B came out swapped, the d-pad
+was dead (the RG552 doesn't report it as a hat), and the shoulders /
+triggers landed on the wrong actions.
+
+- Pocket Curator now drives gamepad input through SDL's GameController
+  API instead of raw joystick indices. The launcher exports the
+  device's own SDL controller mapping (SDL_GAMECONTROLLERCONFIG, taken
+  from the firmware's sdl_controllerconfig), so A/B/X/Y, the d-pad,
+  shoulders, and triggers are all STANDARDIZED by SDL regardless of the
+  pad's raw evdev order. The RG552's GO-Super Gamepad - and any other
+  pad the firmware has a mapping for - now maps right: A confirms, B
+  backs out, d-pad navigates, L1/R1 page, L2/R2 scroll the
+  description, Select opens settings.
+- Raw-joystick translation (v0.64.4's approach) remains as a fallback
+  for any pad the firmware has no SDL mapping for, so input still works
+  even there - just with the generic index layout.
+- Unchanged on Wayland/X11 firmwares (ROCKNIX, Knulli): their
+  compositor delivers the keyboard and neither gamepad path runs.
+
+### If a button is still wrong
+That would mean the firmware's SDL mapping itself disagrees with the
+hardware on that pad. Capture the line the log prints
+("game controller input on ...") and which button misbehaves, and it
+can be corrected with a per-device mapping override.
+
 ## [0.64.4] - 2026-06-11
 
 ### AmberELEC controls + rotation direction
