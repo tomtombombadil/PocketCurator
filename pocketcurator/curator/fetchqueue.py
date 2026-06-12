@@ -41,6 +41,8 @@ class FetchJob:
     rom_size: int = 0
     media: List[MediaFile] = field(default_factory=list)
     gamelist_entry: Optional[str] = None   # source <game> XML, if any
+    dest_dir: Optional[Path] = None        # per-job destination system
+    merge_overwrite: bool = False          # replace existing gamelist entry
 
     def total_bytes(self) -> int:
         return self.rom_size + sum(m.size for m in self.media)
@@ -153,10 +155,11 @@ class FetchQueue:
                 self._snap.error = ""
 
             try:
+                jdest = Path(job.dest_dir) if job.dest_dir else self.dest_dir
                 self._copy_one(job.rom_href,
-                               self.dest_dir / job.rom_name, job.rom_size)
+                               jdest / job.rom_name, job.rom_size)
                 for m in job.media:
-                    dest = self.dest_dir / m.rel_dest
+                    dest = jdest / m.rel_dest
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     self._copy_one(m.href, dest, m.size)
                 with self._lock:

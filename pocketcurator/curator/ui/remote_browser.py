@@ -56,35 +56,74 @@ EXISTS_YELLOW = (235, 200, 50)  # marked but already on the device
 # mapping a remote folder to a local destination and for the smart-jump
 # search. Groups are bidirectional.
 ALIAS_GROUPS = [
+    # Sega
     {"megadrive", "genesis", "md"},
     {"segacd", "megacd"},
-    {"pcengine", "tg16", "turbografx16", "pce"},
-    {"pcenginecd", "tg16cd", "tgcd"},
-    {"supergrafx", "sgfx"},
+    {"sega32x", "32x"},
+    {"saturn", "segasaturn"},
+    {"dreamcast", "dc"},
+    {"mastersystem", "ms", "sms"},
+    {"gamegear", "gg"},
+    {"sg1000", "sg-1000"},
+    # Nintendo
+    {"nes", "famicom", "fc"},
+    {"fds", "famicomdisksystem"},
+    {"snes", "sfc", "superfamicom", "supernintendo"},
+    {"n64", "nintendo64"},
     {"gb", "gameboy"},
     {"gbc", "gameboycolor"},
     {"gba", "gameboyadvance"},
-    {"nes", "famicom", "fc"},
-    {"snes", "sfc", "superfamicom", "supernintendo"},
-    {"n64", "nintendo64"},
+    {"virtualboy", "vb"},
+    {"pokemini", "pokemonmini"},
+    {"gamecube", "gc", "ngc"},
+    {"gw", "gameandwatch"},
+    # NEC
+    {"pcengine", "tg16", "turbografx16", "pce"},
+    {"pcenginecd", "tg16cd", "turbografxcd", "tgcd"},
+    {"supergrafx", "sgfx"},
+    {"pcfx", "pc-fx"},
+    # Atari (ROCKNIX/AmberELEC use atari-prefixed names; Batocera and
+    # Knulli use the bare ones)
     {"lynx", "atarilynx"},
-    {"ngp", "ngpx", "neogeopocket"},
-    {"ngpc", "neogeopocketcolor"},
-    {"psx", "ps1", "playstation"},
-    {"mastersystem", "ms", "sms"},
-    {"gamegear", "gg"},
-    {"colecovision", "coleco"},
-    {"intellivision", "intv"},
-    {"arcade", "mame"},
-    {"fbneo", "fba", "fbn"},
-    {"amstradcpc", "cpc"},
+    {"jaguar", "atarijaguar"},
+    {"jaguarcd", "atarijaguarcd"},
+    {"atari2600", "a2600"},
+    {"atari5200", "a5200"},
+    {"atari7800", "a7800"},
+    {"atari800", "a800"},
     {"atarist", "st"},
-    {"dreamcast", "dc"},
-    {"saturn", "segasaturn"},
+    # Sony
+    {"psx", "ps1", "playstation"},
+    {"ps2", "playstation2"},
+    {"psvita", "vita"},
+    # SNK
+    {"ngp", "neogeopocket"},
+    {"ngpc", "neogeopocketcolor"},
+    {"neogeocd", "neocd"},
+    # Bandai
     {"wonderswan", "wswan"},
     {"wonderswancolor", "wswanc"},
-    {"virtualboy", "vb"},
+    # Arcade
+    {"arcade", "mame"},
+    {"fbneo", "fba", "fbn"},
+    # Computers
+    {"amstradcpc", "cpc"},
+    {"c64", "commodore64"},
+    {"vic20", "c20"},
+    {"zxspectrum", "spectrum", "zx"},
+    {"msx", "msx1"},
+    {"pc88", "pc8800"},
+    {"pc98", "pc9800"},
+    {"dos", "msdos", "pc"},
+    {"amigacd32", "cd32"},
+    # Other consoles
+    {"colecovision", "coleco"},
+    {"intellivision", "intv"},
     {"odyssey2", "videopac", "o2em"},
+    {"channelf", "fairchild"},
+    {"cdi", "cdimono1", "philipscdi"},
+    {"3do", "panasonic3do"},
+    {"pico8", "pico-8"},
 ]
 _ALIASES = {}
 for _grp in ALIAS_GROUPS:
@@ -136,6 +175,15 @@ class RemoteBrowserScreen:
         self.scroll = 0
         self.flagged: Set[int] = set()
         self.flagged_existing: Set[int] = set()   # marked AND on device
+        # Description scroll state - exactly the deletion screen's
+        # mechanism: idle autoscroll unless L2/R2 took manual control.
+        self._desc_offset_px: float = 0.0
+        self._desc_manual: bool = False
+        self._desc_total_h: int = 0
+        self._desc_visible_h: int = 0
+        self._desc_line_h: int = 0
+        self._desc_pause_until: int = 0
+        self._desc_last_ms: int = 0
         self.error = ""
         self.toast = ""
         self._toast_until = 0
@@ -163,7 +211,17 @@ class RemoteBrowserScreen:
         """Every name a device system answers to - shortname, its roms
         folder's leaf, and all aliases of both - maps to that system."""
         out: Dict[str, dict] = {}
-        for s in self.all_systems:
+        # TWO-PASS: exact shortnames and folder leafs claim their names
+        # first, then aliases fill the gaps. Critical on firmwares that
+        # ship region variants as separate systems (ROCKNIX has both
+        # megadrive AND genesis, nes AND famicom): a remote 'genesis'
+        # folder must hit the device's genesis, not megadrive-by-alias.
+        for s in self.all_systems:                       # pass 1: exact
+            out.setdefault(s["shortname"].lower(), s)
+            leaf = Path(str(s.get("path", ""))).name.lower()
+            if leaf:
+                out.setdefault(leaf, s)
+        for s in self.all_systems:                       # pass 2: aliases
             names = set(expand_names(s["shortname"]))
             leaf = Path(str(s.get("path", ""))).name
             if leaf:
@@ -369,11 +427,11 @@ class RemoteBrowserScreen:
                             "this folder - can't copy here.")
             return
         dest = Path(ctx["path"])
+        # ONE queue for the whole session; every job carries its own
+        # destination, so marking more games mid-copy - same system or
+        # a different one - just grows the queue and the progress bar.
         q = getattr(self.app, "fetch_queue", None)
-        if q is not None and q.busy() and q.dest_dir != dest:
-            self._toastline("Finish the current copies first.")
-            return
-        if q is None or q.dest_dir != dest:
+        if q is None:
             q = FetchQueue(self.client, dest,
                            on_job_done=self._merge_job_metadata)
             self.app.fetch_queue = q
@@ -390,8 +448,6 @@ class RemoteBrowserScreen:
                 from ..gamelist_merge import backup_gamelist
                 backup_gamelist(self.app.port_dir, ctx)
                 done.add(key)
-        self._merge_overwrite = not skip_existing
-        self._merge_system_dir = dest
         gl = self._gamelist_for_cwd() if with_media else None
         jobs: List[FetchJob] = []
         skipped = 0
@@ -408,7 +464,9 @@ class RemoteBrowserScreen:
                     entry_xml = ET.tostring(g, encoding="unicode")
             jobs.append(FetchJob(title=Path(e.name).stem, rom_href=e.href,
                                  rom_name=e.name, rom_size=e.size,
-                                 media=media, gamelist_entry=entry_xml))
+                                 media=media, gamelist_entry=entry_xml,
+                                 dest_dir=dest,
+                                 merge_overwrite=not skip_existing))
         if not jobs:
             self.flagged.clear()
             self.flagged_existing.clear()
@@ -436,12 +494,12 @@ class RemoteBrowserScreen:
         """Queue callback (worker thread): after a game's files land,
         inject its source gamelist entry into the destination
         gamelist.xml. Failures log and never disturb the copy."""
-        if not success or not job.gamelist_entry:
+        if not success or not job.gamelist_entry or not job.dest_dir:
             return
         try:
             from ..gamelist_merge import merge_entries
-            merge_entries(self._merge_system_dir, [job.gamelist_entry],
-                          overwrite=getattr(self, "_merge_overwrite", False))
+            merge_entries(job.dest_dir, [job.gamelist_entry],
+                          overwrite=job.merge_overwrite)
         except Exception as exc:  # noqa: BLE001 - never break the copy
             print(f"[gamelist-merge] skipped for '{job.title}': {exc}")
 
@@ -493,6 +551,19 @@ class RemoteBrowserScreen:
                 from .jump import JumpScreen
                 self.app.push_screen(JumpScreen(self.app, self.entries,
                                                 on_pick=self._jump_to))
+        elif k == pygame.K_LEFTBRACKET:
+            # L2: page up. Takes manual control - autoscroll won't
+            # fight us. (Same semantics as the deletion screen.)
+            self._desc_manual = True
+            page = max(20, self._desc_visible_h - self._desc_line_h)
+            self._desc_offset_px = max(0.0, self._desc_offset_px - page)
+        elif k == pygame.K_RIGHTBRACKET:
+            # R2: page down, clamped to the last line.
+            self._desc_manual = True
+            page = max(20, self._desc_visible_h - self._desc_line_h)
+            max_offset = max(0, self._desc_total_h - self._desc_visible_h)
+            self._desc_offset_px = min(float(max_offset),
+                                       self._desc_offset_px + page)
         elif k == pygame.K_F1:
             from .settings_screen import SettingsScreen
             self.app.push_screen(SettingsScreen(self.app))
@@ -510,6 +581,9 @@ class RemoteBrowserScreen:
         else:
             self.selected = max(0, min(n - 1, self.selected + d))
         self._preview_due_ms = pygame.time.get_ticks() + PREVIEW_DEBOUNCE_MS
+        self._desc_offset_px = 0.0
+        self._desc_manual = False
+        self._desc_pause_until = pygame.time.get_ticks() + 1200
 
     def _jump_to(self, index: int) -> None:
         if self.entries:
@@ -574,9 +648,14 @@ class RemoteBrowserScreen:
             self._toastline("Mark games with A first.", 3000)
             return
         marked = [self.entries[i] for i in sorted(self.flagged)]
+        rom_bytes = sum(e.size for e in marked)
+        media_bytes = 0
+        for e in marked:
+            for m in self._media_for(e):
+                media_bytes += max(0, m.size)
         from .remote_confirm import RemoteConfirmScreen
         self.app.push_screen(RemoteConfirmScreen(
-            self.app, self.context, marked,
+            self.app, self.context, marked, rom_bytes, media_bytes,
             on_choice=self._start_copy))
 
     # ------------------------------------------------------------------
@@ -775,9 +854,17 @@ class RemoteBrowserScreen:
         if not self.entries:
             return
         e = self.entries[self.selected]
+        # Filesize lives on the header line, right-justified - it no
+        # longer costs a line under the image.
+        if not e.is_dir and e.size:
+            sz = meta_font.render(format_size(e.size), True, muted)
+            surface.blit(sz, (rect.right - pad - sz.get_width(),
+                              rect.y + 4))
         img_y = rect.y + 4 + meta_font.get_linesize() + 6
         max_img_w = rect.width - 2 * pad
-        max_img_h = int(rect.height * 0.70)
+        # 0.64 (was 0.70): one image line traded for a third visible
+        # description line.
+        max_img_h = int(rect.height * 0.64)
 
         if e.is_dir:
             draw_wrapped_text(surface,
@@ -799,46 +886,75 @@ class RemoteBrowserScreen:
         y = img_area_bottom + 6
         gl = self._gamelist_cache.get(self.cwd)
         g = gl.entry(e.name) if gl else None
-        size_line = format_size(e.size)
+        # One meta line: stars (ALWAYS five - empty outlines when no
+        # rating, like the deletion screen) + region + genre.
+        rating = 0.0
+        genre = region = ""
         if g is not None:
-            rating = (g.findtext("rating") or "").strip()
-            x = rect.x + pad
-            if rating:
-                try:
-                    x += draw_stars(surface, x, y, float(rating),
-                                    tuple(theme["accent_color"]),
-                                    muted) + 12
-                except (ValueError, TypeError):
-                    pass
-            if size_line:
-                s = meta_font.render(size_line, True, muted)
-                surface.blit(s, (x, y))
-            y += meta_font.get_linesize() + 6
+            try:
+                rating = float((g.findtext("rating") or "0").strip() or 0)
+            except (ValueError, TypeError):
+                rating = 0.0
             genre = (g.findtext("genre") or "").strip()
             region = (g.findtext("region") or "").strip()
-            if not region:
-                import re as _re
-                m = _re.search(r"\(([^)]+)\)", e.name)
-                if m and len(m.group(1)) <= 24:
-                    region = m.group(1)
-            bits = "  \u2022  ".join(b for b in (region, genre) if b)
-            if bits:
-                render_clipped_text(surface, bits, meta_font, muted,
-                                    pygame.Rect(rect.x + pad, y, max_img_w,
-                                                meta_font.get_linesize()))
-                y += meta_font.get_linesize() + 6
-            desc = (g.findtext("desc") or "").strip()
-            if desc:
-                desc_font = self.app.fonts.get(max(12, int(base * 0.85)))
-                drect = pygame.Rect(rect.x + pad, y, max_img_w,
-                                    rect.bottom - y - 6)
-                draw_wrapped_text(surface,
-                                  wrap_text(desc, desc_font, drect.w),
-                                  desc_font, text_c, drect)
-        else:
-            if size_line:
-                s = meta_font.render(size_line, True, muted)
-                surface.blit(s, (rect.x + pad, y))
+        if not region:
+            import re as _re
+            m = _re.search(r"\(([^)]+)\)", e.name)
+            if m and len(m.group(1)) <= 24:
+                region = m.group(1)
+        x = rect.x + pad
+        x += draw_stars(surface, x, y, rating,
+                        tuple(theme["accent_color"]), muted) + 12
+        bits = "  \u2022  ".join(b for b in (region, genre) if b)
+        if bits:
+            render_clipped_text(surface, bits, meta_font, muted,
+                                pygame.Rect(x, y, rect.right - pad - x,
+                                            meta_font.get_linesize()))
+        y += meta_font.get_linesize() + 6
+        # Description: 3+ visible lines, idle autoscroll, L2/R2 manual
+        # paging - the deletion screen's mechanism, mirrored.
+        desc = (g.findtext("desc") or "").strip() if g is not None else ""
+        if desc:
+            desc_font = self.app.fonts.get(max(12, int(base * 0.85)))
+            drect = pygame.Rect(rect.x + pad, y, max_img_w,
+                                rect.bottom - y - 6)
+            lines = wrap_text(desc, desc_font, drect.w)
+            self._desc_line_h = desc_font.get_linesize()
+            self._desc_total_h = self._desc_line_h * len(lines)
+            self._desc_visible_h = drect.height
+            now = pygame.time.get_ticks()
+            dt = min(0.1, max(0.0, (now - self._desc_last_ms) / 1000.0)) \
+                if self._desc_last_ms else 0.0
+            self._desc_last_ms = now
+            overflow = max(0, self._desc_total_h - self._desc_visible_h)
+            if (ui.get("description_autoscroll", True)
+                    and not self._desc_manual and overflow
+                    and now >= self._desc_pause_until):
+                speed = ui.get("description_autoscroll_speed_px_per_sec", 18)
+                if getattr(self, "_desc_at_bottom", False):
+                    # paused at the end; snap back to the top and pause
+                    self._desc_offset_px = 0.0
+                    self._desc_at_bottom = False
+                    self._desc_pause_until = now + 1200
+                else:
+                    self._desc_offset_px += speed * dt
+                    if self._desc_offset_px >= overflow:
+                        self._desc_offset_px = float(overflow)
+                        self._desc_at_bottom = True
+                        self._desc_pause_until = now + 2500
+            if self._desc_offset_px > overflow:
+                self._desc_offset_px = float(overflow)
+            prev = surface.get_clip()
+            surface.set_clip(drect)
+            draw_wrapped_text(surface, lines, desc_font, text_c,
+                              pygame.Rect(drect.x,
+                                          drect.y
+                                          - int(self._desc_offset_px),
+                                          drect.w,
+                                          self._desc_total_h
+                                          + drect.height),
+                              )
+            surface.set_clip(prev)
 
     def _draw_legend(self, surface, theme, ui, rect) -> None:
         pygame.draw.rect(surface, tuple(theme["legend_bg_color"]), rect)
@@ -848,9 +964,14 @@ class RemoteBrowserScreen:
         snap = q.snapshot() if q is not None else None
         now = pygame.time.get_ticks()
 
+        toast_live = self.toast and now < self._toast_until
         if snap is not None and snap.active:
-            # "Copying 4/10: Title" over a thick whole-queue bar.
-            txt = font.render(snap.legend_text(), True, fg)
+            # "Copying 4/10: Title" over a thick whole-queue bar. A
+            # live toast REPLACES the text line for its few seconds -
+            # refusals and notices must be visible mid-copy, not hidden
+            # under the progress text.
+            txt = font.render(self.toast if toast_live
+                              else snap.legend_text(), True, fg)
             surface.blit(txt, (10, rect.y + 2))
             bar_h = 7
             bar = pygame.Rect(10, rect.bottom - bar_h - 2,
@@ -861,7 +982,7 @@ class RemoteBrowserScreen:
                              pygame.Rect(bar.x + 1, bar.y + 1,
                                          fill, bar_h - 2))
             return
-        if self.toast and now < self._toast_until:
+        if toast_live:
             surface.blit(font.render(self.toast, True, fg),
                          (10, rect.y + (rect.h - font.get_height()) // 2))
             return

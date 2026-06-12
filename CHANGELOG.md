@@ -2,6 +2,79 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [0.64.1] - 2026-06-11
+
+### AmberELEC: we built the missing SDL
+- Binary analysis settled the display mystery's mechanics: the pygame
+  wheel's bundled SDL contains ONLY wayland/dummy/offscreen video
+  drivers (verified with `strings` on the .so) - the bundled-kmsdrm
+  probes could never pass on any device. dArkOS works because its
+  system SDL (2.32) is accepted as an upgrade preload; AmberELEC's
+  (2.26.2) is refused as a downgrade, leaving no viable combination.
+  The eyewitness v0.61.13 success on the RG552 is fully consistent
+  with the device having run an AmberELEC build with a newer system
+  SDL at the time (nightly vs stable carry different SDL versions) -
+  worth checking which build that card runs now.
+- The fix removes the dependency on whatever the firmware ships:
+  `libs.aarch64/pcsdl/libSDL2-2.0.so.0` is our own SDL **2.28.4**
+  cross-compiled for aarch64 with KMSDRM enabled in dlopen mode. The
+  version exactly matches the bundled pygame's SDL, so the preload
+  passes pygame's check everywhere; libdrm/libgbm/EGL/GLES resolve at
+  runtime from the device's own /usr/lib. It lives in a subdirectory
+  deliberately, so it never shadows pygame's SDL on firmwares that
+  don't need it. AmberELEC's preferred probe now tries it first; it's
+  also a general ladder fallback. Rebuild recipe ships at
+  tools/build_pcsdl.sh.
+
+### Folder translation matrix, done properly
+- ~60 alias groups grounded in the firmware naming families
+  (Batocera/Knulli bare names vs ROCKNIX/AmberELEC/ArkOS atari-
+  prefixed and region-variant names): jaguar=atarijaguar,
+  lynx=atarilynx, nes=famicom, snes=sfc, megadrive=genesis=md,
+  pcengine=tg16, psx=ps1, dos=msdos, amigacd32=cd32, gw=gameandwatch,
+  channelf=fairchild, cdi=cdimono1, and the rest of the catalog.
+- The lookup is now TWO-PASS: exact shortnames and folder leafs claim
+  their names first, aliases only fill gaps - critical on ROCKNIX,
+  which ships region variants as separate systems (both megadrive AND
+  genesis): a remote genesis folder now maps to the device's genesis,
+  never megadrive-by-alias.
+
+### The silent mid-copy enqueue, fixed at the root
+- There is now ONE fetch queue per session and every job carries its
+  own destination system. Marking more games while a copy runs - same
+  system or a different one - simply joins the live queue and grows
+  the progress bar. The old per-destination queue refused cross-
+  system enqueues with a toast that the progress bar was hiding.
+- Toasts now REPLACE the progress text line for their few seconds
+  instead of being drawn under it - refusals and notices are visible
+  mid-copy, never silent again.
+
+### Copy confirmation
+- Short wrapped title ("Copy 302 games to Game Gear?"); the sizes
+  moved onto the options themselves: "Copy w/ Scrapings (78.4 MB)" /
+  "Copy (ROMs only) (52.3 MB)" - scrapings size is computed from the
+  cached media listings up front.
+- "Free space: X GB" along the bottom above the help text, with a
+  warning when the scrapings copy won't fit - and a hard stop if a
+  copy that doesn't fit is selected.
+
+### Fetch right panel, reworked
+- Filesize moved up to the header line (right-justified) - no longer
+  costs a line under the image.
+- Five stars ALWAYS draw (empty outlines when unrated), like the
+  deletion screen.
+- Image area trimmed 0.70 -> 0.64 of the panel: three description
+  lines now visible.
+- The description autoscrolls when idle and L2/R2 page it manually -
+  the deletion screen's exact mechanism, including the pause-at-end /
+  snap-to-top cycle and reset on selection change.
+
+### Exit path
+- On a successful connection the intermediate screens (network scan
+  results) collapse, so the browser sits directly above the source
+  picker: backing out lands on the live server list - which includes
+  the server just used - with no stale scan dialog in between.
+
 ## [0.64.0] - 2026-06-11
 
 ### Gamelist metadata injection (new - the gamelist rule, amended)

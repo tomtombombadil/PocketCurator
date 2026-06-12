@@ -135,9 +135,14 @@ class _MenuScreen:
         small = self.app.fonts.get(max(11, int(base * 0.72)))
         pad = max(18, int(base * 0.8))
         y = box.y + pad
-        surface.blit(title_font.render(self.title, True, text_c),
-                     (box.x + pad, y))
-        y += title_font.get_linesize() + 10
+        # Titles wrap (max 2 lines) instead of running off the box -
+        # "Copy 302 games to Game Gear?" stays inside the dialog.
+        from ..render import wrap_text as _wt
+        for ln in _wt(self.title, title_font, box.w - 2 * pad)[:2]:
+            surface.blit(title_font.render(ln, True, text_c),
+                         (box.x + pad, y))
+            y += title_font.get_linesize()
+        y += 10
 
         line_h = font.get_linesize() + 8
         visible = max(1, (box.h - (y - box.y) - pad * 2
@@ -388,6 +393,13 @@ def _connect_and_open(app, system: dict, src: Source, parent,
             return
         parent.status = ""
         remember_source(app, src)
+        # Collapse intermediate screens (network scan results, etc.) so
+        # the browser sits directly above the source picker: backing
+        # out of the browser then lands on the always-current server
+        # list, not a stale scan dialog missing the server just used.
+        while (getattr(app, "_screens", None)
+               and isinstance(app._screens[-1], ScanScreen)):
+            app.pop_screen()
         from .remote_browser import RemoteBrowserScreen
         app.push_screen(RemoteBrowserScreen(app, system, client, systems))
 

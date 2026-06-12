@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.64.0
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v0.64.1
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -435,7 +435,13 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
     darkos|arkos)
       preferred="kmsdrm+sysSDL|kmsdrm|LD_PRELOAD=$SYS_SDL2" ;;
     amberelec)
-      preferred="kmsdrm|kmsdrm|" ;;
+      if [ -f "$GAMEDIR/pocketcurator/libs.aarch64/pcsdl/libSDL2-2.0.so.0" ]; then
+        preferred="kmsdrm+pcSDL|kmsdrm|LD_PRELOAD=$GAMEDIR/pocketcurator/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
+      elif [ -f "$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0" ]; then
+        preferred="kmsdrm+pcSDL|kmsdrm|LD_PRELOAD=$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
+      else
+        preferred="kmsdrm|kmsdrm|"
+      fi ;;
     *)
       preferred="" ;;
   esac
@@ -462,6 +468,14 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   # dropped from PYTHONPATH so the runtime pygame loads instead.
   probe_attempts+=("kmsdrm+runtimePygame|kmsdrm|PYTHONPATH=$GAMEDIR")
   probe_attempts+=("x11+runtimePygame|x11|PYTHONPATH=$GAMEDIR")
+  # Our own SDL build (libs.aarch64/pcsdl): 2.28.4 with KMSDRM in
+  # dlopen mode - the answer for firmwares whose system SDL is too old
+  # to preload (AmberELEC) while the pygame wheel's SDL has no kmsdrm.
+  PC_SDL="$GAMEDIR/pocketcurator/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
+  [ -f "$PC_SDL" ] || PC_SDL="$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
+  if [ -f "$PC_SDL" ]; then
+    probe_attempts+=("kmsdrm+pcSDL|kmsdrm|LD_PRELOAD=$PC_SDL")
+  fi
   if [ -n "$preferred" ]; then
     probe_attempts=("$preferred" "${probe_attempts[@]}")
   fi
