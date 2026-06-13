@@ -71,22 +71,6 @@ def _log(msg: str) -> None:
     print(f"[ports_gamelist] {msg}", file=sys.stderr)
 
 
-def desc_marker() -> str:
-    """A short phrase that appears in the CURRENT description but is
-    unlikely to appear in an older one, so the deferred installer loop
-    can confirm OUR latest description specifically landed (not just any
-    Pocket Curator entry). Falls back to a generic phrase if parsing the
-    description changes shape later."""
-    desc = OUR_FIELDS.get("desc", "")
-    for phrase in ("copy and delete games and whole",
-                   "Connect to WebDAV servers",
-                   "without removing your SD card"):
-        if phrase in desc:
-            return phrase
-    # Generic fallback: a chunk from the middle of the description.
-    return desc[40:80].strip() or "Pocket Curator"
-
-
 def entry_needs_metadata(ports_dir: Path) -> bool:
     """
     Read-only check: does our Pocket Curator entry need enrichment in any

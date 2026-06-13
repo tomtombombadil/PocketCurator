@@ -2,6 +2,32 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.9] - 2026-06-13
+
+### Fixed: pre-release update check crashed the app
+- Pressing Y on Check For Updates called a function that didn't exist,
+  throwing a NameError that dropped the user back to EmulationStation.
+  The pre-release path is now exactly the normal update path with TWO
+  differences and nothing else: the GitHub endpoint it reads
+  (/releases for pre-releases vs /releases/latest for stable) and the
+  button that starts it (Y vs A). All the duplicate pre-release workers
+  were removed; one flag selects the URL. When you're already on the
+  newest build it now reports "up to date" instead of crashing.
+
+### Fixed: Pocket Curator metadata written repeatedly
+- The deferred metadata installer looped, re-writing and re-reloading up
+  to five times "until it stuck". That was both wrong-headed and the
+  cause of EmulationStation refreshing twice on exit. It now writes ONCE
+  and reloads ONCE: ES owns our entry while the port runs and rewrites
+  it from RAM on the game-exit flush, so the write is scheduled for when
+  ES is idle at its menu, then a single in-place reload makes ES adopt
+  it. The needs-update check compares the WHOLE description (and every
+  other managed field) exactly - it either matches or it doesn't.
+
+### Fixed: EmulationStation refreshed twice on exit
+- Root cause was the metadata retry loop above issuing multiple reloads.
+  With one write + one reload, exit triggers exactly one refresh.
+
 ## [1.0.8] - 2026-06-13
 
 ### Fixed (properly this time): Pocket Curator's own description never updating

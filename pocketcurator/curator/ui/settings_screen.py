@@ -171,11 +171,13 @@ class SettingsScreen:
             self._adjust(+1 if event.key == pygame.K_RIGHT else -1)
         elif event.key == pygame.K_y:
             # Hidden developer shortcut: Y on the Check For Updates row
-            # checks + installs the newest PRE-RELEASE. Undocumented on
-            # purpose; every other row ignores Y.
+            # runs the SAME update flow against pre-releases. Undocumented
+            # on purpose; every other row ignores Y.
             opt = self.options[self.selected]
             if opt.get("label") == "Check For Updates":
-                _open_update_prerelease(self.app)
+                _updater(self.app)
+                from .update_screen import UpdateScreen
+                self.app.push_screen(UpdateScreen(self.app, prerelease=True))
         elif event.key == pygame.K_RETURN:
             # A on a bool toggles, on a choice/color cycles forward, on
             # an action runs it.

@@ -99,37 +99,25 @@ fi
 pm_message "Installing Pocket Curator metadata. Your Emulation Station gameslist will automatically refresh in a few seconds."
 
 # Schedule the write + reload to run AFTER this script exits and ES has
-# returned to its idle menu (past its game-exit flush). We wait, then
-# write + reload, and stop as soon as our metadata is confirmed present -
-# so a device where the first pass works gets exactly one refresh.
-# Slower devices retry a few times. Detached (setsid) so it survives our
-# exit. No restart - the reload is in-place.
+# returned to its idle menu (past its game-exit flush). ES owns our
+# <game> node while a port is running and rewrites it from RAM on the
+# game-exit flush; the only moment a write sticks is when ES is idle at
+# its menu. So we wait for that, write ONCE, and reload ONCE. The reload
+# (disk->RAM) makes ES adopt our on-disk change; it cannot clobber it the
+# way a RAM->disk flush would. Detached (setsid) so it survives our exit.
 seq='
   sleep 8
   PC_API_OK=0
-  for _i in 1 2 3 4 5; do
-    if command -v timeout >/dev/null 2>&1; then
-      timeout 30 "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
-    else
-      "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 30 "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
+  else
+    "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
+  fi
+  if command -v curl >/dev/null 2>&1; then
+    if curl -s -m 8 http://localhost:1234/reloadgames >/dev/null 2>&1; then
+      PC_API_OK=1
     fi
-    if command -v curl >/dev/null 2>&1; then
-      if curl -s -m 8 http://localhost:1234/reloadgames >/dev/null 2>&1; then
-        PC_API_OK=1
-      fi
-    fi
-    sleep 2
-    # Stop once our CURRENT metadata is present and (ES now idle) staying
-    # put. We confirm a distinctive phrase from the latest description -
-    # NOT just the video path, which is present from any prior install
-    # and so used to let this loop quit on pass 1, before a later ES
-    # flush clobbered a freshly-written description. Re-writing and
-    # re-checking each pass lets us win the race against that flush.
-    if grep -q "$PC_DESC_MARKER" "$PC_GAMELIST" 2>/dev/null; then
-      break
-    fi
-    sleep 2
-  done
+  fi
   # ArkOS family (incl. dArkOS) has no reloadgames API; the write above
   # landed on disk but the running ES will not show it (and could flush
   # a stale copy over it later). Queue one ES service restart so it
@@ -147,17 +135,10 @@ seq='
     fi
   fi
 '
-# A short, stable phrase from the CURRENT canonical description, used by
-# the deferred loop to confirm OUR latest text actually landed (and
-# survived ES's flush) before it stops. Sourced from the Python helper so
-# there is a single source of truth for the description.
-PC_DESC_MARKER="$("$PYBIN" -c "import sys; sys.path.insert(0, '$GAMEDIR'); from curator.ports_gamelist import desc_marker; print(desc_marker())" 2>/dev/null)"
-[ -n "$PC_DESC_MARKER" ] || PC_DESC_MARKER="PocketCurator.mp4"
-
 if command -v setsid >/dev/null 2>&1; then
-  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" PC_DESC_MARKER="$PC_DESC_MARKER" setsid bash -c "$seq" >/dev/null 2>&1 &
+  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" setsid bash -c "$seq" >/dev/null 2>&1 &
 else
-  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" PC_DESC_MARKER="$PC_DESC_MARKER" bash -c "$seq" >/dev/null 2>&1 &
+  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" bash -c "$seq" >/dev/null 2>&1 &
   disown 2>/dev/null || true
 fi
 

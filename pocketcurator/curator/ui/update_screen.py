@@ -31,10 +31,7 @@ class UpdateScreen:
         self.prerelease = prerelease
         # Kick the pipeline immediately; harmless no-op if it's already
         # running or an update is already staged.
-        if prerelease:
-            self.updater.start_full_prerelease()
-        else:
-            self.updater.start_full()
+        self.updater.start_full(prerelease=prerelease)
 
     # ------------------------------------------------------------------
 
@@ -80,10 +77,7 @@ class UpdateScreen:
             self.app.pop_screen()
         elif event.key == pygame.K_RETURN:
             if self.updater.state == "error":
-                if getattr(self, "prerelease", False):
-                    self.updater.start_full_prerelease()
-                else:
-                    self.updater.start_full()
+                self.updater.start_full(prerelease=getattr(self, "prerelease", False))
             elif not self.updater.busy():
                 self.app.pop_screen()
 

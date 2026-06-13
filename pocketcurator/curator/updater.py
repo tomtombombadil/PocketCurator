@@ -131,28 +131,16 @@ class Updater:
         self.error = ""
         self._spawn(self._download_worker)
 
-    def start_full(self) -> None:
-        """Check, and if an update exists, download + verify + stage it
-        in one motion - no second confirmation. This is what the update
-        dialog runs; the whole pipeline logs as it goes."""
+    def start_full(self, prerelease: bool = False) -> None:
+        """Check, and if an update exists, download + verify + stage it in
+        one motion. The ONLY thing the pre-release flag changes is which
+        GitHub endpoint we read; everything after is identical."""
         if self.busy() or self.state == STAGED:
             return
+        self._prerelease = prerelease
         self.state = CHECKING
         self.error = ""
         self._spawn(self._full_worker)
-
-    def start_full_prerelease(self) -> None:
-        """Hidden developer channel: check the newest PRE-RELEASE and, if
-        it differs from what's installed, download + stage it in one
-        motion. Not surfaced in the UI help text - triggered by Y on the
-        Check For Updates row. Unlike the normal channel it installs a
-        pre-release even if its version is not strictly newer, so you can
-        move between test builds freely."""
-        if self.busy() or self.state == STAGED:
-            return
-        self.state = CHECKING
-        self.error = ""
-        self._spawn(self._full_prerelease_worker)
 
     def _full_worker(self) -> None:
         self._check_worker()
@@ -160,61 +148,6 @@ class Updater:
             self.state = DOWNLOADING
             self.progress = 0.0
             self._download_worker()
-
-    def _full_prerelease_worker(self) -> None:
-        self._check_prerelease_worker()
-        if self.state == AVAILABLE:
-            self.state = DOWNLOADING
-            self.progress = 0.0
-            self._download_worker()
-
-    def _check_prerelease_worker(self) -> None:
-        try:
-            self._say("checking for PRE-RELEASE (developer channel)...")
-            if not shutil.which("curl"):
-                raise UpdateError("curl not found on this firmware.")
-            data = self._fetch_json(API_RELEASES)
-            if not isinstance(data, list):
-                raise UpdateError("Unexpected releases response.")
-            # Newest pre-release that has our port zip attached. GitHub
-            # returns releases newest-first; honor that order.
-            chosen = None
-            for rel in data:
-                if not rel.get("prerelease"):
-                    continue
-                zip_asset = sha_asset = None
-                for a in rel.get("assets", []) or []:
-                    name = str(a.get("name", ""))
-                    if ASSET_RE.match(name):
-                        zip_asset = a
-                    elif name.endswith(".zip.sha256"):
-                        sha_asset = a
-                if zip_asset:
-                    chosen = (rel, zip_asset, sha_asset)
-                    break
-            if not chosen:
-                self._say("no pre-release with a port zip found")
-                self.state = UP_TO_DATE
-                return
-            rel, zip_asset, sha_asset = chosen
-            tag = str(rel.get("tag_name", ""))
-            # Install pre-releases even if not strictly newer, but skip a
-            # redundant re-install of the exact version already running.
-            if _version_tuple(tag) == _version_tuple(self.current_version):
-                self._say(f"already on pre-release {tag}")
-                self.state = UP_TO_DATE
-                return
-            self.latest_version = tag.lstrip("vV")
-            self._say(f"pre-release found: {tag} "
-                      f"({int(zip_asset.get('size', 0) or 0) // 1024} KB)")
-            self._asset_url = zip_asset.get("browser_download_url", "")
-            self._asset_size = int(zip_asset.get("size", 0) or 0)
-            self._sha_url = (sha_asset or {}).get("browser_download_url", "")
-            self.state = AVAILABLE
-        except UpdateError as exc:
-            self._fail(str(exc))
-        except Exception as exc:  # noqa - never crash the UI thread's app
-            self._fail(f"Pre-release check failed: {exc}")
 
     def _say(self, msg: str) -> None:
         print(f"[updater] {msg}")
@@ -260,14 +193,33 @@ class Updater:
 
     def _check_worker(self) -> None:
         try:
-            self._say(f"checking for update (current v{self.current_version})...")
+            prerelease = getattr(self, "_prerelease", False)
+            kind = "pre-release" if prerelease else "update"
+            self._say(f"checking for {kind} "
+                      f"(current v{self.current_version})...")
             if not shutil.which("curl"):
                 raise UpdateError("curl not found on this firmware.")
-            data = self._fetch_json(API_LATEST)
-            tag = str(data.get("tag_name", ""))
-            assets = data.get("assets", []) or []
+
+            # The ONLY difference between the two channels: which release
+            # we read. Stable -> /releases/latest. Pre-release -> the
+            # newest entry in /releases that is flagged prerelease.
+            if prerelease:
+                data = self._fetch_json(API_RELEASES)
+                rel = None
+                for r in (data if isinstance(data, list) else []):
+                    if r.get("prerelease"):
+                        rel = r
+                        break
+                if rel is None:
+                    self._say("no pre-release found")
+                    self.state = UP_TO_DATE
+                    return
+            else:
+                rel = self._fetch_json(API_LATEST)
+
+            tag = str(rel.get("tag_name", ""))
             zip_asset = sha_asset = None
-            for a in assets:
+            for a in rel.get("assets", []) or []:
                 name = str(a.get("name", ""))
                 if ASSET_RE.match(name):
                     zip_asset = a
@@ -276,11 +228,11 @@ class Updater:
             if not tag or not zip_asset:
                 raise UpdateError("Release found but no port zip attached.")
             if _version_tuple(tag) <= _version_tuple(self.current_version):
-                self._say(f"up to date (latest release is {tag})")
+                self._say(f"up to date (latest {kind} is {tag})")
                 self.state = UP_TO_DATE
                 return
             self.latest_version = tag.lstrip("vV")
-            self._say(f"update found: {tag} "
+            self._say(f"{kind} found: {tag} "
                       f"({int(zip_asset.get('size', 0) or 0) // 1024} KB)")
             self._asset_url = zip_asset.get("browser_download_url", "")
             self._asset_size = int(zip_asset.get("size", 0) or 0)
