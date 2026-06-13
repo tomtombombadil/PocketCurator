@@ -2,6 +2,24 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.4] - 2026-06-12
+
+### Restored
+- The Status dialog's Internet and Clock rows are back. They were
+  removed by mistake in v1.0.1 while removing the update check; only
+  the update check should have gone. The update check stays removed
+  (Check For Updates owns that); Internet reachability and clock-sanity
+  are reported again, alongside the Refresh Games List On Exit line.
+
+### Fixed
+- Fetch screen: with Auto-Scroll Description on (or scrolling with
+  R1/L2), the description text scrolled up over the image, stars, and
+  region line. The fetch screen was faking the scroll by moving an
+  oversized rectangle and setting its own clip, which the text drawer
+  then overwrote. It now scrolls exactly like the deletion screen -
+  same clip rectangle, scroll handled by the drawer's own offset - so
+  the text stays inside the description area. Affected all firmwares.
+
 ## [1.0.3] - 2026-06-12
 
 ### Fixed: doubled input on Knulli and dArkOS (the v1.0.2 fix didn't reach them)

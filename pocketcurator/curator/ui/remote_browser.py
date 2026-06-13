@@ -978,17 +978,13 @@ class RemoteBrowserScreen:
                         self._desc_pause_until = now + 2500
             if self._desc_offset_px > overflow:
                 self._desc_offset_px = float(overflow)
-            prev = surface.get_clip()
-            surface.set_clip(drect)
-            draw_wrapped_text(surface, lines, desc_font, text_c,
-                              pygame.Rect(drect.x,
-                                          drect.y
-                                          - int(self._desc_offset_px),
-                                          drect.w,
-                                          self._desc_total_h
-                                          + drect.height),
-                              )
-            surface.set_clip(prev)
+            # Draw exactly like the deletion screen: pass the REAL drect
+            # and let draw_wrapped_text handle clipping + the scroll via
+            # its y_offset. (Previously we faked the scroll by moving an
+            # oversized rect and set our own clip, which draw_wrapped_text
+            # overwrote - so the text scrolled up over the image/stars.)
+            draw_wrapped_text(surface, lines, desc_font, text_c, drect,
+                              y_offset=int(self._desc_offset_px))
 
     def _draw_legend(self, surface, theme, ui, rect) -> None:
         pygame.draw.rect(surface, tuple(theme["legend_bg_color"]), rect)

@@ -14,16 +14,33 @@ from __future__ import annotations
 
 import pygame
 
+import threading
+
 from .. import __version__
-from ..updater import Updater
+from ..updater import Updater, check_internet, clock_is_sane
 
 
 class StatusScreen:
     def __init__(self, app):
         self.app = app
+        self._internet: str = "Checking..."
+        self._clock: str = "Checking..."
         self._closed = False
+        threading.Thread(target=self._probe, daemon=True).start()
 
     # ------------------------------------------------------------------
+
+    def _probe(self) -> None:
+        """Internet reachability + clock-sanity rows, off the UI thread.
+        Deliberately does NOT check for updates - that's the Check For
+        Updates row's job - it only reports connectivity and whether the
+        clock is sane enough for TLS."""
+        online = check_internet()
+        if self._closed:
+            return
+        self._internet = "Connected" if online else "No Internet Connection"
+        self._clock = ("Synced (secure connections OK)" if clock_is_sane()
+                       else "Not synced - secure connections may fail")
 
     def _update_status(self) -> str:
         """Report the LATEST KNOWN update state without checking again -
@@ -106,6 +123,8 @@ class StatusScreen:
             ("OS", str(app.firmware_name)),
             ("ROMs Location", str(app.roms_dir) if app.roms_dir else "n/a"),
             ("Theme", app.theme_dir.name if app.theme_dir else "n/a"),
+            ("Internet", self._internet),
+            ("Clock", self._clock),
         ]
 
         label_w = max(body_font.size(lbl + ":")[0] for lbl, _ in rows) + 18
