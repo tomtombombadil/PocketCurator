@@ -2,6 +2,52 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.5] - 2026-06-13
+
+### Fixed: theme logos (dArkOS + Batocera)
+- Pocket Curator was showing the Super Famicom logo for SNES (and
+  Family Computer for NES, and the wrong one for PC Engine / TG16) -
+  different from what the user's themed EmulationStation shows. Cause:
+  an alias logo file (sfc.png) in a theme template we preferred could
+  beat the primary-name file (snes.png) in another template. Now the
+  PRIMARY system name is tried across ALL of a theme's logo templates
+  before any alias, so Pocket Curator matches ES. Aliases still cover
+  themes that genuinely only ship the alternate name.
+
+### Fixed: runaway font size (Batocera)
+- The auto-scale wrote its scaled result back into the same setting it
+  read from, so each launch re-scaled the already-scaled value
+  (22 -> 53 -> 127...). The user's chosen size is now stored
+  separately and the per-screen scale is computed fresh each launch,
+  so it stays put. An install that already inflated recovers to a sane
+  size on next launch.
+
+### Fixed: fetch screenshot clipping (Batocera)
+- The preview image could overflow its reserved area and clip down
+  into the stars/region line. It's now clamped to the current area
+  every frame, like the deletion screen.
+
+### Fixed: phantom "systems"
+- Single-game port engines that present themselves as ES systems
+  (Half-Life and ~30 others on Batocera/Knulli) are no longer listed
+  as game systems.
+
+### Faster: copy confirmation
+- The confirm dialog now opens IMMEDIATELY and shows "Calculating File
+  Sizes..." while it totals scraped-media sizes in the background
+  (previously it stalled after pressing X on large selections). The
+  scrapings copy waits until sizing finishes; ROMs-only is available
+  at once.
+
+### New: live transfer rate
+- The "Copying ##/##" line now shows a right-justified download speed
+  (1 decimal, KB/s or MB/s), smoothed so it doesn't jitter.
+
+### New: progress that follows you
+- The copy progress (title + speed + bar) now persists as a strip at
+  the bottom of whatever screen you're on, so leaving the fetch UI no
+  longer hides an in-progress copy.
+
 ## [1.0.4] - 2026-06-12
 
 ### Restored

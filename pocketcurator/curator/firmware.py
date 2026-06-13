@@ -192,6 +192,16 @@ ES_NON_GAME_SYSTEMS = {
     # Single-game engines often shipped as "systems" in es_systems.cfg
     "cannonball", "devilutionx", "solarus", "duke3d",
     "quake", "wolf3d", "ecwolf", "rott",
+    # Batocera/Knulli single-game port "systems" (engines that present
+    # as a system but are one game, not a ROM collection).
+    "halflife", "hlsp", "halflife2", "hl2", "xash3d",
+    "sonicretro", "sonic-mania", "sonicmania", "sm64", "supermario64",
+    "cdogs", "cgenius", "commandergenius", "dxx-rebirth", "dxxrebirth",
+    "eduke32", "fallout1", "fallout2", "flatpak", "fury",
+    "gzdoom", "hcl", "hurrican", "ioquake3", "jazz2", "jazzjackrabbit",
+    "minecraft", "mrboom", "openjazz", "opentyrian", "openttd",
+    "pico8", "pico-8", "prboomplus", "ruffle", "sdlpop2",
+    "tyrian", "uqm", "uracer", "vvvvvv", "xrick", "znez",
 }
 
 

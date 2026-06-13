@@ -15,6 +15,7 @@ follow-up offers Overwrite / Skip for those.
 from __future__ import annotations
 
 import shutil
+import threading
 from pathlib import Path
 from typing import Callable, List
 
@@ -26,8 +27,10 @@ from .remote_flow import _MenuScreen
 
 class RemoteConfirmScreen(_MenuScreen):
     def __init__(self, app, system: dict, marked: List[RemoteEntry],
-                 rom_bytes: int, media_bytes: int,
-                 on_choice: Callable[[bool, bool], None]):
+                 rom_bytes: int,
+                 on_choice: Callable[[bool, bool], None],
+                 media_sizer: Callable[[], int] = None,
+                 media_bytes: int = None):
         super().__init__(
             app,
             f"Copy {len(marked)} game{'s' if len(marked) != 1 else ''} "
@@ -36,7 +39,10 @@ class RemoteConfirmScreen(_MenuScreen):
         self.marked = marked
         self.on_choice = on_choice
         self.rom_bytes = rom_bytes
+        # media_bytes may be known up front (legacy callers) or computed
+        # in the background from media_sizer. None => still calculating.
         self.media_bytes = media_bytes
+        self._sizing = media_bytes is None and media_sizer is not None
         dest = Path(system["path"])
         self.existing = [e for e in marked if (dest / e.name).exists()]
         # disk_usage needs an existing path; an empty-but-new system
@@ -50,16 +56,37 @@ class RemoteConfirmScreen(_MenuScreen):
             self.free = shutil.disk_usage(probe).free
         except OSError:
             self.free = None
-        self.items = [
-            f"Copy w/ Scrapings ({format_size(rom_bytes + media_bytes)})",
-            f"Copy (ROMs only) ({format_size(rom_bytes)})",
-            "Cancel",
-        ]
+        self._rebuild_items()
+        if self._sizing:
+            threading.Thread(target=self._compute_media, args=(media_sizer,),
+                             daemon=True).start()
+
+    def _rebuild_items(self) -> None:
+        if self._sizing or self.media_bytes is None:
+            with_scrapings = "Copy w/ Scrapings (Calculating File Sizes...)"
+            roms_only = f"Copy (ROMs only) ({format_size(self.rom_bytes)})"
+        else:
+            with_scrapings = ("Copy w/ Scrapings "
+                              f"({format_size(self.rom_bytes + self.media_bytes)})")
+            roms_only = f"Copy (ROMs only) ({format_size(self.rom_bytes)})"
+        self.items = [with_scrapings, roms_only, "Cancel"]
+
+    def _compute_media(self, sizer: Callable[[], int]) -> None:
+        try:
+            total = sizer()
+        except Exception:  # noqa: BLE001 - sizing must never crash the dialog
+            total = 0
+        self.media_bytes = max(0, total)
+        self._sizing = False
+        self._rebuild_items()
 
     def _needed(self, with_media: bool) -> int:
-        return self.rom_bytes + (self.media_bytes if with_media else 0)
+        media = self.media_bytes or 0
+        return self.rom_bytes + (media if with_media else 0)
 
     def _fits(self, with_media: bool) -> bool:
+        if with_media and self.media_bytes is None:
+            return True  # unknown yet; don't show a false "won't fit"
         return (self.free is None
                 or self._needed(with_media) + 32 * 1024 * 1024 <= self.free)
 
@@ -68,6 +95,11 @@ class RemoteConfirmScreen(_MenuScreen):
             self.app.pop_screen()
             return
         with_media = index == 0
+        # Block the scrapings copy until media sizes are known, so we
+        # never start a copy we haven't size/fit-checked.
+        if with_media and (self._sizing or self.media_bytes is None):
+            self.status = "Still calculating file sizes - one moment..."
+            return
         if not self._fits(with_media):
             self.status = (f"NOT ENOUGH SPACE - that copy needs "
                            f"{format_size(self._needed(with_media))} but "
@@ -83,14 +115,21 @@ class RemoteConfirmScreen(_MenuScreen):
             self.on_choice(with_media, False)
 
     def draw(self, surface: pygame.Surface) -> None:
-        if not self.status.startswith("NOT ENOUGH"):
+        # While media sizing runs in the background, keep the menu label
+        # in sync (Calculating... -> real size) each frame.
+        if self._sizing:
+            self._rebuild_items()
+        if not self.status.startswith("NOT ENOUGH") and not self.status.startswith("Still calculating"):
             bits = []
             if self.existing:
                 bits.append(f"{len(self.existing)} of these are already "
                             f"on this handheld.")
             if self.free is not None:
-                fit = ("" if self._fits(True)
-                       else " - scrapings copy will NOT fit")
+                if self._sizing or self.media_bytes is None:
+                    fit = ""
+                else:
+                    fit = ("" if self._fits(True)
+                           else " - scrapings copy will NOT fit")
                 bits.append(f"Free space: {format_size(self.free)}{fit}")
             self.status = "   ".join(bits)
         super().draw(surface)

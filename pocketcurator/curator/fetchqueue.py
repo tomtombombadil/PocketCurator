@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import shutil
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -61,6 +62,18 @@ class QueueSnapshot:
     completed: int = 0
     failed: List[str] = field(default_factory=list)
     error: str = ""
+    speed_bps: float = 0.0      # smoothed transfer rate, bytes/sec
+
+    def speed_text(self) -> str:
+        """Compact right-justified rate, 1 decimal, KB/s or MB/s.
+        Empty when idle or not yet measured."""
+        if not self.active or self.speed_bps <= 0:
+            return ""
+        mbps = self.speed_bps / (1024.0 * 1024.0)
+        if mbps >= 1.0:
+            return f"{mbps:.1f} MB/s"
+        kbps = self.speed_bps / 1024.0
+        return f"{kbps:.1f} KB/s"
 
     def legend_text(self) -> str:
         """One line above the progress bar: the queue position and the
@@ -88,6 +101,10 @@ class FetchQueue:
         self._snap = QueueSnapshot()
         self._thread: Optional[threading.Thread] = None
         self._cancel = False
+        # transfer-rate sampling (worker thread only)
+        self._spd_last_t: float = 0.0
+        self._spd_last_bytes: int = 0
+        self._spd_ema: float = 0.0
 
     # ------------------------------------------------------------------
 
@@ -137,7 +154,7 @@ class FetchQueue:
                 queue_bytes_done=s.queue_bytes_done + s.file_done,
                 queue_bytes_total=s.queue_bytes_total,
                 completed=s.completed, failed=list(s.failed),
-                error=s.error)
+                error=s.error, speed_bps=self._spd_ema)
 
     # ------------------------------------------------------------------
 
@@ -146,6 +163,8 @@ class FetchQueue:
             with self._lock:
                 if not self._jobs or self._cancel:
                     self._snap.active = False
+                    self._spd_ema = 0.0
+                    self._spd_last_t = 0.0
                     if self._cancel:
                         self._jobs.clear()
                     return
@@ -181,9 +200,25 @@ class FetchQueue:
 
     def _copy_one(self, href: str, dest: Path, size: int) -> None:
         def on_progress(done: int, total: int) -> None:
+            now = time.monotonic()
             with self._lock:
                 self._snap.file_done = done
                 self._snap.file_total = total or size
+                # Whole-queue cumulative bytes for an even rate estimate
+                # across files (avoids a reset-to-zero blip per file).
+                cum = self._snap.queue_bytes_done + done
+                if self._spd_last_t <= 0:
+                    self._spd_last_t = now
+                    self._spd_last_bytes = cum
+                else:
+                    dt = now - self._spd_last_t
+                    if dt >= 0.25:   # sample ~4x/sec
+                        inst = max(0.0, (cum - self._spd_last_bytes) / dt)
+                        # EMA smoothing so the figure doesn't jitter.
+                        self._spd_ema = (inst if self._spd_ema <= 0
+                                         else 0.65 * self._spd_ema + 0.35 * inst)
+                        self._spd_last_t = now
+                        self._spd_last_bytes = cum
 
         with self._lock:
             self._snap.file_done = 0

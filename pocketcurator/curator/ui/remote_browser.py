@@ -675,14 +675,21 @@ class RemoteBrowserScreen:
             return
         marked = [self.entries[i] for i in sorted(self.flagged)]
         rom_bytes = sum(e.size for e in marked)
-        media_bytes = 0
-        for e in marked:
-            for m in self._media_for(e):
-                media_bytes += max(0, m.size)
+        # Media sizing requires a PROPFIND per game and is slow for big
+        # selections, so we DON'T block on it here. The dialog opens
+        # immediately and computes media size in the background; pass a
+        # callable it can run off-thread plus the rom total it can show
+        # right away.
+        def size_media():
+            total = 0
+            for e in marked:
+                for m in self._media_for(e):
+                    total += max(0, m.size)
+            return total
         from .remote_confirm import RemoteConfirmScreen
         self.app.push_screen(RemoteConfirmScreen(
-            self.app, self.context, marked, rom_bytes, media_bytes,
-            on_choice=self._start_copy))
+            self.app, self.context, marked, rom_bytes,
+            media_sizer=size_media, on_choice=self._start_copy))
 
     # ------------------------------------------------------------------
     # Preview (remote gamelist + screenshot)
@@ -912,6 +919,19 @@ class RemoteBrowserScreen:
         if (self._preview_img is not None
                 and self._preview_img_for == self.selected):
             img = self._preview_img
+            # The preview is scaled by a background worker against the
+            # max_h captured when the request was made. If that differs
+            # from the area we're drawing into now (different panel size,
+            # e.g. on Batocera), a too-tall cached image would overflow
+            # the reserved area and clip down into the stars/region line.
+            # Clamp to the CURRENT reserved area before blitting so the
+            # image can never bleed past img_area_bottom - matching the
+            # deletion screen, which rescales every frame.
+            iw, ih = img.get_width(), img.get_height()
+            if iw > max_img_w or ih > max_img_h:
+                fit = min(max_img_w / iw, max_img_h / ih)
+                img = pygame.transform.smoothscale(
+                    img, (max(1, int(iw * fit)), max(1, int(ih * fit))))
             ix = rect.x + (rect.width - img.get_width()) // 2
             iy = img_y + (max_img_h - img.get_height()) // 2
             surface.blit(img, (ix, iy))
@@ -1003,6 +1023,15 @@ class RemoteBrowserScreen:
             txt = font.render(self.toast if toast_live
                               else snap.legend_text(), True, fg)
             surface.blit(txt, (10, rect.y + 2))
+            # Right-justified live transfer rate on the same line as
+            # "Copying ##/##" (hidden while a toast is occupying the line).
+            if not toast_live:
+                spd = snap.speed_text()
+                if spd:
+                    spd_surf = font.render(spd, True, fg)
+                    surface.blit(spd_surf,
+                                 (rect.right - 10 - spd_surf.get_width(),
+                                  rect.y + 2))
             bar_h = 7
             bar = pygame.Rect(10, rect.bottom - bar_h - 2,
                               rect.w - 20, bar_h)

@@ -18,11 +18,14 @@ import pygame
 #   accessor: callable(config) -> current value
 #   For int_range, options dict includes min/max/step.
 def _set_font_size_locked(c, v):
-    """Setter for font_size_base. Also marks the value as user-locked so
-    the next launch's resolution-based auto-scale doesn't trample it.
-    Without this, a user who picks 40 on a 1920x1152 screen would see
-    96 (or capped 80) on the next launch."""
+    """Setter for the Font Size control. The user is choosing an explicit
+    on-screen size, so we lock it (no resolution auto-scale on the next
+    launch) and store it as BOTH the effective size used this session
+    (font_size_base) and the persisted user value (font_size_user) the
+    next launch reads. Writing font_size_user is what stops the old
+    runaway-rescale bug (22 -> 53 -> 127...)."""
     c["ui"]["font_size_base"] = v
+    c["ui"]["font_size_user"] = v
     c["ui"]["font_size_base_locked"] = True
 
 

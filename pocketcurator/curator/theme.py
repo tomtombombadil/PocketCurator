@@ -428,14 +428,23 @@ def find_system_logo(theme_dir: Optional[Path],
         # if the preferred file happens to be missing.
         applicable = [tmpl for cond, tmpl in paths
                       if _condition_satisfied(cond, region, subsets)]
-        for tmpl in reversed(applicable):
-            for name in names:
+        # IMPORTANT: try the PRIMARY shortname across ALL templates before
+        # falling to any alias. Otherwise an alias file in a
+        # preferred (later, reversed-first) template - e.g. sfc.png -
+        # would beat the primary file (snes.png) in an earlier template,
+        # so we'd show the Super Famicom logo where ES shows the SNES
+        # one. EmulationStation resolves by the system's own name first;
+        # aliases are only our compatibility shim for themes that don't
+        # use the firmware's exact shortname, so they must rank last.
+        for name in names:
+            for tmpl in reversed(applicable):
                 expanded = _expand_vars(tmpl, name, variables)
                 candidate = _template_to_path(theme_dir, expanded)
                 if candidate.is_file():
                     return candidate
 
-    # Last-ditch: legacy hardcoded layout guesses.
+    # Last-ditch: legacy hardcoded layout guesses (primary name first
+    # here too, for the same reason).
     for name in names:
         for tmpl in LOGO_PATH_TEMPLATES:
             candidate = theme_dir / tmpl.format(sys=name)

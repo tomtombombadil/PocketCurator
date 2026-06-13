@@ -257,17 +257,37 @@ class App:
         # because everything around it is taking proportionally more
         # room. We auto-scale up from a 480px baseline; the user can
         # still override in settings.json with a hard value.
-        base_from_settings = self.config["ui"].get("font_size_base", 18)
-        if not self.config["ui"].get("font_size_base_locked", False):
+        # The persisted USER value lives in font_size_base. We must never
+        # multiply it back into itself, or each launch re-scales the
+        # already-scaled value (22 -> 53 -> 127...), which is exactly the
+        # runaway-font bug seen on Batocera. So we read the user value,
+        # compute a per-run EFFECTIVE size from it, and write the
+        # effective size into font_size_base for this session's
+        # consumers - but remember the untouched user value in
+        # font_size_user so the next launch scales from the same source.
+        ui_cfg = self.config["ui"]
+        user_base = ui_cfg.get("font_size_user")
+        if user_base is None:
+            # First run on this install (or upgrading from a build that
+            # only had font_size_base): adopt the current base as the
+            # user value. Guard against inheriting an already-inflated
+            # number from the old buggy behavior by clamping to a sane
+            # ceiling for the *unscaled* base.
+            user_base = ui_cfg.get("font_size_base", 18)
+            user_base = max(8, min(48, int(user_base)))
+            ui_cfg["font_size_user"] = user_base
+        if not ui_cfg.get("font_size_base_locked", False):
             # Linear scale from 480px reference. 480 -> base, 720 -> ~1.5x,
             # 1152 -> ~2.4x. Capped at 2.8x to avoid silly results on
             # very large desktop test screens.
             scale = min(2.8, max(1.0, self.screen_h / 480.0))
-            self.config["ui"]["font_size_base"] = max(14,
-                int(round(base_from_settings * scale)))
+            ui_cfg["font_size_base"] = max(14, int(round(user_base * scale)))
             print(f"[app] screen {self.screen_w}x{self.screen_h}, "
-                  f"font_size_base {base_from_settings} -> "
-                  f"{self.config['ui']['font_size_base']} (scale x{scale:.2f})")
+                  f"font_size_base {user_base} -> "
+                  f"{ui_cfg['font_size_base']} (scale x{scale:.2f})")
+        else:
+            # Locked: the user set an explicit value; use it verbatim.
+            ui_cfg["font_size_base"] = max(8, int(user_base))
 
         # ---- shared resources ------------------------------------------
         fonts_dir = self.assets_dir / "fonts"
@@ -651,6 +671,49 @@ class App:
             self._display.blit(rotated, (0, 0))
         pygame.display.flip()  # PRESENT_FLIP
 
+    def _draw_global_fetch_progress(self, top) -> None:
+        """Persistent fetch progress, drawn over WHATEVER screen is up
+        while the copy queue is busy - so backing out of the fetch UI
+        (or going anywhere else) doesn't hide that a copy is still
+        running. The fetch browser draws its own richer bar in its
+        legend, so we skip the overlay there to avoid doubling.
+        """
+        q = getattr(self, "fetch_queue", None)
+        if q is None or not q.busy():
+            return
+        # Don't double up on the fetch browser's own legend bar.
+        if type(top).__name__ == "RemoteBrowserScreen":
+            return
+        snap = q.snapshot()
+        if not snap.active:
+            return
+        ui = self.config["ui"]
+        theme = self.config["theme"]
+        font = self.fonts.get(max(11, int(ui["font_size_base"] * 0.7)))
+        fg = tuple(theme["legend_text_color"])
+        bg = tuple(theme["legend_bg_color"])
+        W = self.screen_w
+        pad = 10
+        line_h = font.get_linesize()
+        strip_h = line_h + 10
+        y0 = self.screen_h - strip_h
+        strip = pygame.Rect(0, y0, W, strip_h)
+        pygame.draw.rect(self.surface, bg, strip)
+        # text: "Copying ##/##: Title"  + right-justified speed
+        label = snap.legend_text()
+        self.surface.blit(font.render(label, True, fg), (pad, y0 + 3))
+        spd = snap.speed_text()
+        if spd:
+            s = font.render(spd, True, fg)
+            self.surface.blit(s, (W - pad - s.get_width(), y0 + 3))
+        # thin progress bar along the very bottom
+        bar_h = 4
+        bar = pygame.Rect(pad, self.screen_h - bar_h - 2, W - 2 * pad, bar_h)
+        pygame.draw.rect(self.surface, tuple(theme["muted_color"]), bar, 1)
+        fill = int((bar.w - 2) * snap.queue_fraction())
+        pygame.draw.rect(self.surface, fg,
+                         pygame.Rect(bar.x + 1, bar.y + 1, fill, bar_h - 2))
+
     def run(self) -> int:
         self.start()
 
@@ -727,6 +790,7 @@ class App:
 
             top = self._screens[-1]
             top.draw(self.surface)
+            self._draw_global_fetch_progress(top)
             self._present()
             self.clock.tick(fps_cap)
 
@@ -815,6 +879,7 @@ class App:
             "ui": {
                 "list_width_pct": 0.40,
                 "font_size_base": 22,
+                "font_size_user": 22,
                 "marquee_delay_ms": 600,
                 "marquee_speed_px_per_sec": 60,
                 "description_autoscroll": False,
