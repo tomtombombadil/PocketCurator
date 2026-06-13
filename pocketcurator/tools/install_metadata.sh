@@ -108,7 +108,11 @@ seq='
   sleep 8
   PC_API_OK=0
   for _i in 1 2 3 4 5; do
-    "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 30 "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
+    else
+      "$PC_PYBIN" -u "$PC_HELPER" >/dev/null 2>&1
+    fi
     if command -v curl >/dev/null 2>&1; then
       if curl -s -m 8 http://localhost:1234/reloadgames >/dev/null 2>&1; then
         PC_API_OK=1

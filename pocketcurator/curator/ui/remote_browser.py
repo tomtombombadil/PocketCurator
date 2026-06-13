@@ -167,10 +167,19 @@ def _format_region(region: str) -> str:
 
 
 def expand_names(name: str):
-    """name + every alias of it, lowercased."""
+    """name + every alias of it, lowercased - from BOTH the hand-curated
+    firmware matrix (system_matrix.csv, authoritative) and the built-in
+    alias groups (fallback for anything not yet in the matrix)."""
     n = name.lower()
-    return _ALIASES.get(n, {n}) | {n}   # marked-for-fetch: the inverse mood of
-                              # deletion's red X - bright green plus
+    names = set(_ALIASES.get(n, {n})) | {n}
+    try:
+        from ..system_matrix import get_matrix
+        matrix_aliases = get_matrix().aliases_for(n)
+        if matrix_aliases:
+            names |= set(matrix_aliases)
+    except Exception:  # noqa: BLE001 - matrix is best-effort
+        pass
+    return names
 
 MEDIA_DIRS = ("images", "videos", "manuals", "media", "downloaded_images")
 MEDIA_TAGS = ("image", "thumbnail", "marquee", "video", "manual")
@@ -670,27 +679,14 @@ class RemoteBrowserScreen:
 
     def _go_back(self) -> None:
         """B: exactly one level back along the visited path; at the top
-        of the stack, leave the browser - reminding the user, if this
-        session copied anything, that ES only learns about the new
-        games when Pocket Curator exits."""
+        of the stack, leave the browser. (No post-copy notice: fetched
+        games already show in Pocket Curator's own lists immediately, and
+        EmulationStation refreshes automatically on exit, so the old
+        ATTENTION pop-up no longer served a purpose.)"""
         if self._nav:
             self._load_async(self._nav.pop(), push=False)
             return
-        if self._copied_any:
-            self._copied_any = False
-            from .remote_flow import NoticeScreen
-
-            def leave():
-                self.app.pop_screen()           # the browser
-            self.app.push_screen(NoticeScreen(
-                self.app, "ATTENTION",
-                "The games you just downloaded are NOT in the games "
-                "lists yet. Not in Emulation Station or Pocket Curator. "
-                "They will appear after the games lists refresh, which "
-                "happens when you exit Pocket Curator.",
-                on_close=leave))
-        else:
-            self.app.pop_screen()
+        self.app.pop_screen()
 
     def _confirm_copy(self) -> None:
         if self.context is None:

@@ -2,6 +2,53 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.7] - 2026-06-13
+
+### Fetch destination matrix (the big one)
+- Added a hand-maintainable firmware roms-folder matrix
+  (curator/system_matrix.csv): one row per system, columns for the
+  Pocket Curator ID, the three regional names (NA / EU-World / JP), and
+  the actual roms folder each firmware uses (ROCKNIX, Knulli, dArkOS,
+  AmberELEC, Batocera), plus notes. Fetch destination matching now
+  consults this matrix first, so systems whose folder name differs per
+  firmware resolve correctly. Fixes Atari Jaguar being refused on
+  Batocera (Batocera's folder is "jaguar", not "atarijaguar") and the
+  Amiga split (Batocera/Knulli amiga500/amiga1200 vs a plain "amiga").
+  The matrix is data, not code - it can be corrected without touching
+  the app.
+
+### Fixed: Pocket Curator's own description never updating
+- On Batocera/ROCKNIX the on-exit refresh used the in-place reload
+  (disk -> RAM) but never wrote our updated metadata to disk first, so
+  the reload just re-read the old description. The launcher now writes
+  our metadata to disk before the reload when our entry needs updating,
+  and an updated-but-present entry uses that path (the deferred
+  installer is now only for a genuinely missing entry, which is why the
+  description never stuck before).
+
+### Status dialog
+- Added "SD Card Free Space" right after ROMs Location.
+- "Refresh Games List On Exit" is now "Refresh Games List", with the
+  pending state shown as "Pending (On Exit)".
+- The dialog now auto-shrinks its font to fit and uses tighter line
+  spacing, so everything fits on small screens.
+
+### Removed
+- The post-copy ATTENTION pop-up. Fetched games already appear in
+  Pocket Curator's own lists immediately and ES refreshes on exit, so
+  it no longer served a purpose.
+
+### Installer / metadata hardening
+- The one-file installer now flushes each step to disk (with sync) so a
+  freeze leaves a diagnosable breadcrumb, and runs the metadata step
+  under a hard timeout so it can never hang the install. The deferred
+  metadata refresh also bounds its helper calls. (Groundwork for the
+  fresh-Knulli installer freeze, which couldn't be reproduced from a
+  log; please grab pocketcurator_install.log if it recurs.)
+
+### Notes
+- dArkOS exit "garbage text" cleanup still pending a fresh log.
+
 ## [1.0.6] - 2026-06-13
 
 ### CRITICAL: fetch destination resolution (Batocera/Knulli)

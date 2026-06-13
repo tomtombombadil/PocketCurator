@@ -12,6 +12,7 @@ network rows read 'No Internet Connection'.
 
 from __future__ import annotations
 
+from pathlib import Path
 import pygame
 
 import threading
@@ -59,13 +60,35 @@ class StatusScreen:
             return "checking..."
         return "not checked this session"
 
+    def _sd_free_text(self) -> str:
+        """Free space on the volume that holds the ROMs."""
+        import shutil as _sh
+        roms = getattr(self.app, "roms_dir", None)
+        if not roms:
+            return "n/a"
+        probe = Path(str(roms))
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        try:
+            free = _sh.disk_usage(probe).free
+        except OSError:
+            return "n/a"
+        # compact human size
+        units = ["B", "KB", "MB", "GB", "TB"]
+        f = float(free)
+        i = 0
+        while f >= 1024 and i < len(units) - 1:
+            f /= 1024.0
+            i += 1
+        return f"{f:.1f} {units[i]}"
+
     def _refresh_status(self) -> str:
         """Whether the games list will be refreshed when Pocket Curator
         exits. Pending if anything was deleted or fetched this session.
         """
         pending = (getattr(self.app, "deletions_occurred", False)
                    or getattr(self.app, "fetches_occurred", False))
-        return "Pending" if pending else "Not Necessary"
+        return "Pending (On Exit)" if pending else "Not Necessary"
 
     # ------------------------------------------------------------------
 
@@ -119,29 +142,56 @@ class StatusScreen:
         app = self.app
         rows = [
             ("Version", f"v{__version__}  ({self._update_status()})"),
-            ("Refresh Games List On Exit", self._refresh_status()),
+            ("Refresh Games List", self._refresh_status()),
             ("OS", str(app.firmware_name)),
             ("ROMs Location", str(app.roms_dir) if app.roms_dir else "n/a"),
+            ("SD Card Free Space", self._sd_free_text()),
             ("Theme", app.theme_dir.name if app.theme_dir else "n/a"),
             ("Internet", self._internet),
             ("Clock", self._clock),
         ]
 
-        label_w = max(body_font.size(lbl + ":")[0] for lbl, _ in rows) + 18
-        line_h = body_font.get_linesize() + 8
         muted = tuple(theme["muted_color"])
         text = tuple(theme["text_color"])
+
+        # Auto-fit: shrink the body font until every row (label + wrapped
+        # value) fits between the title and the close-hint, so nothing
+        # overflows on small screens. Tighter line spacing than before to
+        # pack more in.
+        hint_text = "Press A or B to close."
+        avail_top = y
+        avail_bottom = box.bottom - small_font.get_linesize() - pad
+        avail_h = avail_bottom - avail_top
+
+        fit_size = base
+        while fit_size >= 10:
+            bf = self.app.fonts.get(fit_size)
+            label_w = max(bf.size(lbl + ":")[0] for lbl, _ in rows) + 14
+            line_h = bf.get_linesize() + 3   # tightened from +8
+            max_val_w = box.w - pad * 2 - label_w
+            total = 0
+            for _lbl, val in rows:
+                parts = self._wrap(bf, str(val), max_val_w) or [""]
+                total += line_h * len(parts)
+            if total <= avail_h:
+                break
+            fit_size -= 1
+
+        body_font = self.app.fonts.get(fit_size)
+        label_w = max(body_font.size(lbl + ":")[0] for lbl, _ in rows) + 14
+        line_h = body_font.get_linesize() + 3
         max_val_w = box.w - pad * 2 - label_w
 
         for lbl, val in rows:
             lab = body_font.render(lbl + ":", True, muted)
             surface.blit(lab, (box.x + pad, y))
-            for part in self._wrap(body_font, str(val), max_val_w):
+            parts = self._wrap(body_font, str(val), max_val_w) or [""]
+            for part in parts:
                 vs = body_font.render(part, True, text)
                 surface.blit(vs, (box.x + pad + label_w, y))
                 y += line_h
 
-        hint = small_font.render("Press A or B to close.", True, muted)
+        hint = small_font.render(hint_text, True, muted)
         surface.blit(hint, (box.x + pad, box.bottom - hint.get_height() - pad))
 
     @staticmethod

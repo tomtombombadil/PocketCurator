@@ -51,15 +51,30 @@ def main() -> int:
     # only the deferred/ES-down write sticks.
     try:
         reason = ""
-        if bool(getattr(app, "deletions_occurred", False)) \
-                or bool(getattr(app, "fetches_occurred", False)):
+        deletes_or_fetches = (bool(getattr(app, "deletions_occurred", False))
+                              or bool(getattr(app, "fetches_occurred", False)))
+        if deletes_or_fetches:
             # Fetched games are new files ES hasn't seen; the same
             # reload that surfaces deletions surfaces them.
             reason = "deletions"
         try:
-            from curator.ports_gamelist import entry_needs_metadata
+            from curator.ports_gamelist import (entry_needs_metadata,
+                                                entry_exists)
             if entry_needs_metadata(here.parent):
-                reason = "register"
+                # Distinguish a MISSING entry (fresh install -> ES has to
+                # create the bare node first, so use the deferred
+                # installer via 'register') from an entry that merely
+                # needs our fields UPDATED (e.g. a new description). For
+                # the latter the node already exists, so the launcher can
+                # write our fields straight to disk and reload - the
+                # 'metadata'/'both' path. 'register' kept only for the
+                # genuinely-missing case fixed the description never
+                # sticking on updates, because the deferred installer
+                # stopped as soon as it saw our (already present) video.
+                if entry_exists(here.parent):
+                    reason = "both" if deletes_or_fetches else "metadata"
+                else:
+                    reason = "register"
         except Exception:
             pass
         if reason:

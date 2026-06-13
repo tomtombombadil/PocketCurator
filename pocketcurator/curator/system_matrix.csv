@@ -1,0 +1,69 @@
+pc_id,region_na,region_eu,region_jp,rocknix,knulli,darkos,amberelec,batocera,notes
+nes,Nintendo Entertainment System,Nintendo Entertainment System,Famicom,nes,nes,nes,nes,nes,fc/famicom in JP themes
+fds,Famicom Disk System,Famicom Disk System,Famicom Disk System,fds,fds,fds,fds,fds,
+snes,Super Nintendo,Super Nintendo,Super Famicom,snes,snes,snes,snes,snes,sfc in JP themes
+n64,Nintendo 64,Nintendo 64,Nintendo 64,n64,n64,n64,n64,n64,
+gb,Game Boy,Game Boy,Game Boy,gb,gb,gb,gb,gb,
+gbc,Game Boy Color,Game Boy Color,Game Boy Color,gbc,gbc,gbc,gbc,gbc,
+gba,Game Boy Advance,Game Boy Advance,Game Boy Advance,gba,gba,gba,gba,gba,
+nds,Nintendo DS,Nintendo DS,Nintendo DS,nds,nds,nds,nds,nds,
+virtualboy,Virtual Boy,Virtual Boy,Virtual Boy,virtualboy,virtualboy,virtualboy,virtualboy,virtualboy,
+pokemini,Pokemon Mini,Pokemon Mini,Pokemon Mini,pokemini,pokemini,pokemini,pokemini,pokemini,
+gamecube,Nintendo GameCube,Nintendo GameCube,Nintendo GameCube,gamecube,gamecube,,,gamecube,not on small handhelds
+mastersystem,Sega Master System,Sega Master System,Sega Mark III,mastersystem,mastersystem,mastersystem,mastersystem,mastersystem,
+genesis,Sega Genesis,Sega Mega Drive,Sega Mega Drive,genesis,genesis,genesis,genesis,megadrive,Batocera uses megadrive; ROCKNIX has both genesis+megadrive
+megadrive,Sega Genesis,Sega Mega Drive,Sega Mega Drive,megadrive,megadrive,megadrive,megadrive,megadrive,regional twin of genesis
+segacd,Sega CD,Sega Mega CD,Sega Mega CD,segacd,segacd,segacd,segacd,segacd,
+sega32x,Sega 32X,Sega 32X,Super 32X,sega32x,sega32x,sega32x,sega32x,sega32x,also '32x'
+saturn,Sega Saturn,Sega Saturn,Sega Saturn,saturn,saturn,saturn,saturn,saturn,
+dreamcast,Sega Dreamcast,Sega Dreamcast,Sega Dreamcast,dreamcast,dreamcast,dreamcast,dreamcast,dreamcast,
+gamegear,Sega Game Gear,Sega Game Gear,Sega Game Gear,gamegear,gamegear,gamegear,gamegear,gamegear,
+sg-1000,SG-1000,SG-1000,SG-1000,sg-1000,sg-1000,sg-1000,sg-1000,sg1000,Batocera 'sg1000' (no dash)?
+naomi,Sega Naomi,Sega Naomi,Sega Naomi,naomi,naomi,naomi,naomi,naomi,
+psx,PlayStation,PlayStation,PlayStation,psx,psx,psx,psx,psx,aka ps1/playstation
+ps2,PlayStation 2,PlayStation 2,PlayStation 2,ps2,ps2,,,ps2,heavy; not all handhelds
+psp,PlayStation Portable,PlayStation Portable,PlayStation Portable,psp,psp,psp,psp,psp,
+pcengine,TurboGrafx-16,PC Engine,PC Engine,pcengine,pcengine,pcengine,pcengine,pcengine,tg16 regional twin
+tg16,TurboGrafx-16,PC Engine,PC Engine,tg16,tg16,tg16,tg16,tg16,regional twin of pcengine
+pcenginecd,TurboGrafx-CD,PC Engine CD,PC Engine CD,pcenginecd,pcenginecd,pcenginecd,pcenginecd,pcenginecd,
+supergrafx,SuperGrafx,SuperGrafx,PC Engine SuperGrafx,supergrafx,supergrafx,supergrafx,supergrafx,supergrafx,
+pcfx,PC-FX,PC-FX,PC-FX,pcfx,pcfx,pcfx,pcfx,pcfx,
+neogeo,Neo Geo,Neo Geo,Neo Geo,neogeo,neogeo,neogeo,neogeo,neogeo,
+neogeocd,Neo Geo CD,Neo Geo CD,Neo Geo CD,neogeocd,neogeocd,neogeocd,neogeocd,neogeocd,
+ngp,Neo Geo Pocket,Neo Geo Pocket,Neo Geo Pocket,ngp,ngp,ngp,ngp,ngp,
+ngpc,Neo Geo Pocket Color,Neo Geo Pocket Color,Neo Geo Pocket Color,ngpc,ngpc,ngpc,ngpc,ngpc,
+atari2600,Atari 2600,Atari 2600,Atari 2600,atari2600,atari2600,atari2600,atari2600,atari2600,
+atari5200,Atari 5200,Atari 5200,Atari 5200,atari5200,atari5200,atari5200,atari5200,atari5200,
+atari7800,Atari 7800,Atari 7800,Atari 7800,atari7800,atari7800,atari7800,atari7800,atari7800,
+atari800,Atari 800,Atari 800,Atari 800,atari800,atari800,atari800,atari800,atari800,
+atarijaguar,Atari Jaguar,Atari Jaguar,Atari Jaguar,atarijaguar,atarijaguar,atarijaguar,atarijaguar,jaguar,Batocera uses 'jaguar' (no atari prefix)!
+atarilynx,Atari Lynx,Atari Lynx,Atari Lynx,atarilynx,atarilynx,lynx,atarilynx,lynx,Batocera/dArkOS 'lynx'
+atarist,Atari ST,Atari ST,Atari ST,atarist,atarist,atarist,atarist,atarist,
+amiga,Commodore Amiga,Commodore Amiga,Commodore Amiga,amiga,amiga,amiga,amiga,amiga500,Batocera splits amiga500/amiga1200!
+amiga500,Amiga 500,Amiga 500,Amiga 500,,,,,amiga500,Batocera/Knulli specific
+amiga1200,Amiga 1200,Amiga 1200,Amiga 1200,,,,,amiga1200,Batocera/Knulli specific
+amigacd32,Amiga CD32,Amiga CD32,Amiga CD32,amigacd32,amigacd32,amigacd32,amigacd32,amigacd32,
+c64,Commodore 64,Commodore 64,Commodore 64,c64,c64,c64,c64,c64,
+vic20,Commodore VIC-20,Commodore VIC-20,Commodore VIC-20,vic20,vic20,vic20,vic20,vic20,
+amstradcpc,Amstrad CPC,Amstrad CPC,Amstrad CPC,amstradcpc,amstradcpc,amstradcpc,amstradcpc,amstradcpc,
+zxspectrum,ZX Spectrum,ZX Spectrum,ZX Spectrum,zxspectrum,zxspectrum,zxspectrum,zxspectrum,zxspectrum,
+dos,MS-DOS,MS-DOS,MS-DOS,dos,dos,dos,dos,dos,also pc/msdos
+msx,MSX,MSX,MSX,msx,msx,msx,msx,msx,
+msx2,MSX2,MSX2,MSX2,msx2,msx2,msx2,msx2,msx2,
+x68000,Sharp X68000,Sharp X68000,Sharp X68000,x68000,x68000,x68000,x68000,x68000,
+pc98,NEC PC-9800,NEC PC-9800,NEC PC-9800,pc98,pc98,pc98,pc98,pc98,
+arcade,Arcade,Arcade,Arcade,arcade,arcade,arcade,arcade,arcade,
+mame,MAME,MAME,MAME,mame,mame,mame,mame,mame,
+fbneo,FinalBurn Neo,FinalBurn Neo,FinalBurn Neo,fbneo,fbneo,fbneo,fbneo,fbneo,aka fba
+cps1,Capcom Play System,Capcom Play System,Capcom Play System,cps1,cps1,cps1,cps1,cps1,
+cps2,Capcom Play System 2,Capcom Play System 2,Capcom Play System 2,cps2,cps2,cps2,cps2,cps2,
+cps3,Capcom Play System 3,Capcom Play System 3,Capcom Play System 3,cps3,cps3,cps3,cps3,cps3,
+wonderswan,WonderSwan,WonderSwan,WonderSwan,wonderswan,wonderswan,wonderswan,wonderswan,wonderswan,
+wonderswancolor,WonderSwan Color,WonderSwan Color,WonderSwan Color,wonderswancolor,wonderswancolor,wonderswancolor,wonderswancolor,wonderswancolor,
+3do,3DO,3DO,3DO,3do,3do,3do,3do,3do,
+coleco,ColecoVision,ColecoVision,ColecoVision,colecovision,colecovision,coleco,colecovision,colecovision,dArkOS 'coleco'?
+intellivision,Intellivision,Intellivision,Intellivision,intellivision,intellivision,intellivision,intellivision,intellivision,
+vectrex,Vectrex,Vectrex,Vectrex,vectrex,vectrex,vectrex,vectrex,vectrex,
+odyssey2,Magnavox Odyssey 2,Magnavox Odyssey 2,Odyssey 2,odyssey2,odyssey2,odyssey2,odyssey2,o2em,Batocera 'o2em'?
+channelf,Fairchild Channel F,Fairchild Channel F,Fairchild Channel F,channelf,channelf,channelf,channelf,channelf,
+scummvm,ScummVM,ScummVM,ScummVM,scummvm,scummvm,scummvm,scummvm,scummvm,

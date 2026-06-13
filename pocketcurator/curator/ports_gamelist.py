@@ -71,6 +71,30 @@ def _log(msg: str) -> None:
     print(f"[ports_gamelist] {msg}", file=sys.stderr)
 
 
+def entry_exists(ports_dir: Path) -> bool:
+    """True if a Pocket Curator <game> node already exists in any gamelist
+    ES might read. Distinguishes 'our entry is present but a field needs
+    updating' (write straight to disk + reload) from 'no entry at all'
+    (let ES create the bare node first via the deferred installer)."""
+    try:
+        ports_dir = Path(ports_dir)
+    except Exception:
+        return False
+    for path in _gamelist_locations(ports_dir):
+        if not path.exists():
+            continue
+        try:
+            tree = ET.parse(path)
+        except ET.ParseError:
+            continue
+        root = tree.getroot()
+        if root.tag != "gameList":
+            continue
+        if _find_our_game(root) is not None:
+            return True
+    return False
+
+
 def entry_needs_metadata(ports_dir: Path) -> bool:
     """
     Read-only check: does our Pocket Curator entry need enrichment in any

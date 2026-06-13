@@ -69,7 +69,10 @@ LOGF="$PORTS_DIR/pocketcurator_install.log"
 
 say() {
   echo "[PC-Install] $*"
-  echo "$(date '+%F %T') $*" >> "$LOGF" 2>/dev/null
+  # Flush each stage to disk AND sync, so a hard freeze still leaves a
+  # breadcrumb of exactly how far the installer got (we had a fresh
+  # Knulli wedge with no log; this makes the next one diagnosable).
+  { echo "$(date '+%F %T') $*" >> "$LOGF"; sync; } 2>/dev/null
   pm_message "Pocket Curator: $*"
 }
 
@@ -152,11 +155,21 @@ chmod +x "$PORTS_DIR/Pocket Curator.sh" \
 # supported firmware (reload API, or service restart on ArkOS-family) -
 # which also makes the new 'Pocket Curator' entry itself appear.
 say "$tag installed - registering with EmulationStation..."
+# Run metadata registration with a hard timeout so it can NEVER hang the
+# installer or the device. The script schedules its own deferred ES
+# refresh and returns quickly; the timeout is just a backstop.
+_run_meta() {
+  local script="$1"
+  if command -v timeout >/dev/null 2>&1; then
+    PC_SKIP_PMFINISH=1 timeout 60 /bin/bash "$script" >> "$LOGF" 2>&1
+  else
+    PC_SKIP_PMFINISH=1 /bin/bash "$script" >> "$LOGF" 2>&1
+  fi
+}
 if [ -f "$GAMEDIR/tools/install_metadata.sh" ]; then
-  PC_SKIP_PMFINISH=1 /bin/bash "$GAMEDIR/tools/install_metadata.sh" >> "$LOGF" 2>&1
+  _run_meta "$GAMEDIR/tools/install_metadata.sh"     || say "metadata step returned non-zero or timed out (install still OK)"
 elif [ -f "$PORTS_DIR/PocketCuratorMetadataInstall.sh" ]; then
-  # Releases before 0.62.1 shipped it in the ports root.
-  PC_SKIP_PMFINISH=1 /bin/bash "$PORTS_DIR/PocketCuratorMetadataInstall.sh" >> "$LOGF" 2>&1
+  _run_meta "$PORTS_DIR/PocketCuratorMetadataInstall.sh"     || say "metadata step returned non-zero or timed out (install still OK)"
 fi
 
 # Our log started in the ports root before pocketcurator/ existed;
