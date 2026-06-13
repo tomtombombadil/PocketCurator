@@ -23,14 +23,18 @@ from ..updater import Updater
 
 
 class UpdateScreen:
-    def __init__(self, app):
+    def __init__(self, app, prerelease: bool = False):
         self.app = app
         if getattr(app, "updater", None) is None:
             app.updater = Updater(app.port_dir, __version__)
         self.updater = app.updater
+        self.prerelease = prerelease
         # Kick the pipeline immediately; harmless no-op if it's already
         # running or an update is already staged.
-        self.updater.start_full()
+        if prerelease:
+            self.updater.start_full_prerelease()
+        else:
+            self.updater.start_full()
 
     # ------------------------------------------------------------------
 
@@ -76,7 +80,10 @@ class UpdateScreen:
             self.app.pop_screen()
         elif event.key == pygame.K_RETURN:
             if self.updater.state == "error":
-                self.updater.start_full()
+                if getattr(self, "prerelease", False):
+                    self.updater.start_full_prerelease()
+                else:
+                    self.updater.start_full()
             elif not self.updater.busy():
                 self.app.pop_screen()
 

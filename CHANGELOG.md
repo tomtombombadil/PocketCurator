@@ -2,6 +2,32 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.8] - 2026-06-13
+
+### Fixed (properly this time): Pocket Curator's own description never updating
+- Reverted the v1.0.7 launcher/main.py rework that overcomplicated this.
+  The field-merge already overwrites a changed description correctly;
+  the real bug was the deferred metadata loop's STOP condition. It
+  stopped as soon as it saw our video file (PocketCurator.mp4) in the
+  gamelist - which is present from any prior install - so on an existing
+  install it quit on the first pass, before a later ES flush could
+  clobber the freshly-written description. The loop now keeps writing +
+  reloading until a phrase unique to the CURRENT description is
+  confirmed on disk, so the update sticks. This rides the same deferred
+  write/refresh path fetch already uses.
+
+### New (developer): hidden pre-release update channel
+- On the Settings > Check For Updates row, pressing Y checks for and
+  installs the newest GitHub PRE-RELEASE. A still does the normal
+  stable update. Undocumented on purpose - it's for testing builds
+  without exposing them to normal users (pre-releases are excluded from
+  the public "latest" channel).
+
+### Notes
+- system_matrix.csv is seeded but known-incomplete; a corrected, fuller
+  matrix is in progress and will drop in as data (no code change).
+- This build is published as a GitHub pre-release.
+
 ## [1.0.7] - 2026-06-13
 
 ### Fetch destination matrix (the big one)

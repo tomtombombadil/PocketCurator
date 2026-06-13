@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.7
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.8
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -866,24 +866,6 @@ if [ -f "$GAMEDIR/.es_refresh_needed" ]; then
       esac
       echo "[Pocket Curator] refresh reason='$refresh_reason'"
       echo "[Pocket Curator] $refresh_msg"
-      # If this refresh involves our own metadata (description, artwork,
-      # etc.), WRITE it to disk now - BEFORE the reload. The in-place
-      # reload is disk->RAM, so it only adopts our changes if they're
-      # already on disk. ES is idle at its menu by now (the app has
-      # exited and the display was released), which is the one moment a
-      # write to our existing entry sticks. Without this, the reload
-      # just re-read the stale gamelist and our updated description never
-      # appeared (Batocera/ROCKNIX, where the API path is always taken).
-      case "$refresh_reason" in
-        metadata|both)
-          pybin="$(_pc_syspython)"
-          helper="$GAMEDIR/tools/write_ports_metadata.py"
-          if [ -n "$pybin" ] && [ -f "$helper" ]; then
-            echo "[Pocket Curator] writing Ports metadata before reload"
-            "$pybin" -u "$helper" 2>&1 | sed 's/^/[Pocket Curator] /'
-          fi
-          ;;
-      esac
       # The in-place API reload is sub-second and invisible - putting a
       # pm_message before it made every exit pay harbourmaster's slow
       # Python boot just to flash a message about work already done.

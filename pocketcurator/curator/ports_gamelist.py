@@ -71,28 +71,20 @@ def _log(msg: str) -> None:
     print(f"[ports_gamelist] {msg}", file=sys.stderr)
 
 
-def entry_exists(ports_dir: Path) -> bool:
-    """True if a Pocket Curator <game> node already exists in any gamelist
-    ES might read. Distinguishes 'our entry is present but a field needs
-    updating' (write straight to disk + reload) from 'no entry at all'
-    (let ES create the bare node first via the deferred installer)."""
-    try:
-        ports_dir = Path(ports_dir)
-    except Exception:
-        return False
-    for path in _gamelist_locations(ports_dir):
-        if not path.exists():
-            continue
-        try:
-            tree = ET.parse(path)
-        except ET.ParseError:
-            continue
-        root = tree.getroot()
-        if root.tag != "gameList":
-            continue
-        if _find_our_game(root) is not None:
-            return True
-    return False
+def desc_marker() -> str:
+    """A short phrase that appears in the CURRENT description but is
+    unlikely to appear in an older one, so the deferred installer loop
+    can confirm OUR latest description specifically landed (not just any
+    Pocket Curator entry). Falls back to a generic phrase if parsing the
+    description changes shape later."""
+    desc = OUR_FIELDS.get("desc", "")
+    for phrase in ("copy and delete games and whole",
+                   "Connect to WebDAV servers",
+                   "without removing your SD card"):
+        if phrase in desc:
+            return phrase
+    # Generic fallback: a chunk from the middle of the description.
+    return desc[40:80].strip() or "Pocket Curator"
 
 
 def entry_needs_metadata(ports_dir: Path) -> bool:

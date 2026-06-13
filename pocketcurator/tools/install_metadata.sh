@@ -119,8 +119,13 @@ seq='
       fi
     fi
     sleep 2
-    # Stop once our metadata is present and (ES now idle) staying put.
-    if grep -q "PocketCurator.mp4" "$PC_GAMELIST" 2>/dev/null; then
+    # Stop once our CURRENT metadata is present and (ES now idle) staying
+    # put. We confirm a distinctive phrase from the latest description -
+    # NOT just the video path, which is present from any prior install
+    # and so used to let this loop quit on pass 1, before a later ES
+    # flush clobbered a freshly-written description. Re-writing and
+    # re-checking each pass lets us win the race against that flush.
+    if grep -q "$PC_DESC_MARKER" "$PC_GAMELIST" 2>/dev/null; then
       break
     fi
     sleep 2
@@ -142,10 +147,17 @@ seq='
     fi
   fi
 '
+# A short, stable phrase from the CURRENT canonical description, used by
+# the deferred loop to confirm OUR latest text actually landed (and
+# survived ES's flush) before it stops. Sourced from the Python helper so
+# there is a single source of truth for the description.
+PC_DESC_MARKER="$("$PYBIN" -c "import sys; sys.path.insert(0, '$GAMEDIR'); from curator.ports_gamelist import desc_marker; print(desc_marker())" 2>/dev/null)"
+[ -n "$PC_DESC_MARKER" ] || PC_DESC_MARKER="PocketCurator.mp4"
+
 if command -v setsid >/dev/null 2>&1; then
-  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" setsid bash -c "$seq" >/dev/null 2>&1 &
+  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" PC_DESC_MARKER="$PC_DESC_MARKER" setsid bash -c "$seq" >/dev/null 2>&1 &
 else
-  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" bash -c "$seq" >/dev/null 2>&1 &
+  PC_PYBIN="$PYBIN" PC_HELPER="$HELPER" PC_GAMELIST="$GAMELIST" PC_DESC_MARKER="$PC_DESC_MARKER" bash -c "$seq" >/dev/null 2>&1 &
   disown 2>/dev/null || true
 fi
 

@@ -40,6 +40,9 @@ from typing import Optional
 
 GITHUB_REPO = "tomtombombadil/PocketCurator"
 API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+# All releases (newest first), including pre-releases. Used by the hidden
+# developer pre-release channel (Y on Check For Updates).
+API_RELEASES = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
 ASSET_RE = re.compile(r"^pocketcurator_port-v[\d.]+\.zip$")
 
 # Free space demanded before download: zip (~5 MB) + staged tree
@@ -138,12 +141,80 @@ class Updater:
         self.error = ""
         self._spawn(self._full_worker)
 
+    def start_full_prerelease(self) -> None:
+        """Hidden developer channel: check the newest PRE-RELEASE and, if
+        it differs from what's installed, download + stage it in one
+        motion. Not surfaced in the UI help text - triggered by Y on the
+        Check For Updates row. Unlike the normal channel it installs a
+        pre-release even if its version is not strictly newer, so you can
+        move between test builds freely."""
+        if self.busy() or self.state == STAGED:
+            return
+        self.state = CHECKING
+        self.error = ""
+        self._spawn(self._full_prerelease_worker)
+
     def _full_worker(self) -> None:
         self._check_worker()
         if self.state == AVAILABLE:
             self.state = DOWNLOADING
             self.progress = 0.0
             self._download_worker()
+
+    def _full_prerelease_worker(self) -> None:
+        self._check_prerelease_worker()
+        if self.state == AVAILABLE:
+            self.state = DOWNLOADING
+            self.progress = 0.0
+            self._download_worker()
+
+    def _check_prerelease_worker(self) -> None:
+        try:
+            self._say("checking for PRE-RELEASE (developer channel)...")
+            if not shutil.which("curl"):
+                raise UpdateError("curl not found on this firmware.")
+            data = self._fetch_json(API_RELEASES)
+            if not isinstance(data, list):
+                raise UpdateError("Unexpected releases response.")
+            # Newest pre-release that has our port zip attached. GitHub
+            # returns releases newest-first; honor that order.
+            chosen = None
+            for rel in data:
+                if not rel.get("prerelease"):
+                    continue
+                zip_asset = sha_asset = None
+                for a in rel.get("assets", []) or []:
+                    name = str(a.get("name", ""))
+                    if ASSET_RE.match(name):
+                        zip_asset = a
+                    elif name.endswith(".zip.sha256"):
+                        sha_asset = a
+                if zip_asset:
+                    chosen = (rel, zip_asset, sha_asset)
+                    break
+            if not chosen:
+                self._say("no pre-release with a port zip found")
+                self.state = UP_TO_DATE
+                return
+            rel, zip_asset, sha_asset = chosen
+            tag = str(rel.get("tag_name", ""))
+            # Install pre-releases even if not strictly newer, but skip a
+            # redundant re-install of the exact version already running.
+            if _version_tuple(tag) == _version_tuple(self.current_version):
+                self._say(f"already on pre-release {tag}")
+                self.state = UP_TO_DATE
+                return
+            self.latest_version = tag.lstrip("vV")
+            self._say(f"pre-release found: {tag} "
+                      f"({int(zip_asset.get('size', 0) or 0) // 1024} KB)")
+            self._asset_url = zip_asset.get("browser_download_url", "")
+            self._asset_size = int(zip_asset.get("size", 0) or 0)
+            self._sha_url = (sha_asset or {}).get("browser_download_url", "")
+            self.state = AVAILABLE
+        except UpdateError as exc:
+            self._fail(str(exc))
+        except Exception as exc:  # noqa - never crash the UI thread's app
+            self._fail(f"Pre-release check failed: {exc}")
 
     def _say(self, msg: str) -> None:
         print(f"[updater] {msg}")
