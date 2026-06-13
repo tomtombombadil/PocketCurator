@@ -47,7 +47,8 @@ def find_es_config_dir() -> Optional[Path]:
     return None
 
 
-def load_es_systems(config_dir: Path) -> List[dict]:
+def load_es_systems(config_dir: Path,
+                    roms_dir: Optional[Path] = None) -> List[dict]:
     """
     Parse ``es_systems.cfg`` into a list of system dicts. Each dict has::
 
@@ -74,7 +75,7 @@ def load_es_systems(config_dir: Path) -> List[dict]:
     try:
         tree = ET.parse(str(path))
         for system in tree.getroot().iter("system"):
-            extracted = _extract_system(system)
+            extracted = _extract_system(system, roms_dir)
             if extracted is not None:
                 systems.append(extracted)
         return systems
@@ -102,7 +103,7 @@ def load_es_systems(config_dir: Path) -> List[dict]:
         except ET.ParseError:
             skipped += 1
             continue
-        extracted = _extract_system(system_el)
+        extracted = _extract_system(system_el, roms_dir)
         if extracted is not None:
             systems.append(extracted)
             matched += 1
@@ -112,7 +113,7 @@ def load_es_systems(config_dir: Path) -> List[dict]:
     return systems
 
 
-def _extract_system(system_el) -> Optional[dict]:
+def _extract_system(system_el, roms_dir: Optional[Path] = None) -> Optional[dict]:
     """Pull the fields we care about out of a parsed <system> element.
     Returns None for entries that lack a usable shortname or path - those
     aren't worth surfacing as carousel entries even if the XML parsed."""
@@ -120,9 +121,8 @@ def _extract_system(system_el) -> Optional[dict]:
     if not shortname:
         return None
     rom_path = _text(system_el, "path") or ""
-    try:
-        rom_dir = Path(rom_path).expanduser()
-    except (TypeError, ValueError):
+    rom_dir = _resolve_rom_path(rom_path, roms_dir)
+    if rom_dir is None:
         return None
 
     ext_raw = _text(system_el, "extension") or ""
@@ -171,6 +171,40 @@ def load_hidden_systems(config_dir: Path) -> Set[str]:
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
+
+def _resolve_rom_path(rom_path: str, roms_dir: Optional[Path]):
+    """Turn an es_systems.cfg <path> into an absolute directory.
+
+    Batocera (and Knulli) write paths like "%ROMPATH%/amiga500" or a
+    bare "./snes"; left untouched these resolve against the process cwd
+    (the port directory), which is how fetched games ended up dumped in
+    roms/ports/pocketcurator. We expand %ROMPATH% / $ROMPATH and anchor
+    any still-relative path to the device's roms dir so destinations are
+    always absolute and correct.
+    """
+    if not rom_path:
+        return None
+    s = rom_path.strip()
+    # Normalize the ROMPATH variable in its common spellings.
+    anchor = str(roms_dir) if roms_dir else None
+    if anchor:
+        for token in ("%ROMPATH%", "${ROMPATH}", "$ROMPATH"):
+            if token in s:
+                s = s.replace(token, anchor)
+    try:
+        p = Path(s).expanduser()
+    except (TypeError, ValueError):
+        return None
+    if not p.is_absolute():
+        # Strip a leading "./" then anchor to roms_dir (or leave as-is
+        # if we have no anchor, preserving old behavior for dev runs).
+        rel = s[2:] if s.startswith("./") else s
+        if anchor:
+            p = Path(anchor) / rel
+        else:
+            p = Path(rel)
+    return p
+
 
 def _text(elem, tag: str) -> str:
     """Return stripped text of a child element, or empty string."""

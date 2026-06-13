@@ -159,7 +159,7 @@ def discover_systems(roms_dir: Path, systems_db: dict) -> List[dict]:
     es_dir = find_es_config_dir()
     if es_dir is not None:
         print(f"[discover] using ES config at {es_dir}")
-        return _discover_from_es(es_dir)
+        return _discover_from_es(es_dir, roms_dir)
 
     print("[discover] no ES config found - falling back to filesystem scan")
     return _discover_from_filesystem(roms_dir, systems_db)
@@ -210,9 +210,10 @@ def _is_auto_collection(shortname: str) -> bool:
     return shortname.startswith("auto-") or shortname in ES_NON_GAME_SYSTEMS
 
 
-def _discover_from_es(es_dir: Path) -> List[dict]:
+def _discover_from_es(es_dir: Path,
+                      roms_dir: Optional[Path] = None) -> List[dict]:
     """Authoritative system list from EmulationStation's config."""
-    raw_systems = load_es_systems(es_dir)
+    raw_systems = load_es_systems(es_dir, roms_dir)
     hidden = load_hidden_systems(es_dir)
     if hidden:
         print(f"[discover] honoring ES hidden systems: {sorted(hidden)}")
@@ -377,11 +378,38 @@ def _count_from_gamelist(system_dir: Path) -> int:
     except (ET.ParseError, OSError):
         return 0
 
-    count = 0
+    paths = []
     for game in tree.getroot().iter("game"):
         path_el = game.find("path")
         if path_el is not None and path_el.text and path_el.text.strip():
-            count += 1
+            paths.append(path_el.text.strip())
+    count = len(paths)
+
+    # Ghost-system guard. Some firmwares (notably Batocera) ship a few
+    # stock gamelist entries whose ROM files don't actually exist -
+    # Megadrive "Old Towers", PCEngine "Reflectron"/"Santatlanean", and
+    # single-game ports like Half-Life. They make an otherwise-empty
+    # system look "live" with 1-5 games, but entering it shows nothing.
+    # gamelist.xml stays our source of truth for normal systems, but for
+    # a SMALL system (<=5 games) we cheaply confirm at least one listed
+    # ROM exists on disk; if none do, treat the system as empty so it
+    # isn't offered. We cap the check at 5 so big libraries never pay the
+    # per-file stat cost during discovery.
+    if 0 < count <= 5:
+        any_exists = False
+        for rel in paths:
+            rom = (system_dir / rel) if not Path(rel).is_absolute() else Path(rel)
+            try:
+                if rom.exists():
+                    any_exists = True
+                    break
+            except OSError:
+                continue
+        if not any_exists:
+            print(f"[discover] {system_dir.name}: {count} gamelist "
+                  f"entr{'y' if count == 1 else 'ies'} but no ROM files "
+                  f"on disk - treating as empty (ghost system).")
+            return 0
     return count
 
 

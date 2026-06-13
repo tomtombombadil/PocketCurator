@@ -117,6 +117,14 @@ ALIAS_GROUPS = [
     {"pc98", "pc9800"},
     {"dos", "msdos", "pc"},
     {"amigacd32", "cd32"},
+    # Amiga family. Batocera/Knulli split Amiga into amiga500, amiga1200,
+    # amigacd32, amigacdtv and have NO plain "amiga" folder, while a
+    # remote library (and ROCKNIX) commonly use "amiga". Group them so a
+    # remote "amiga" folder resolves to whichever Amiga system the device
+    # actually has. amigacd32 keeps its own group above (it's CD media,
+    # not a floppy Amiga); we include it here too so the broad "amiga"
+    # name can still reach it if it's the only Amiga system present.
+    {"amiga", "amiga500", "amiga1200", "amigacdtv", "commodoreamiga"},
     # Other consoles
     {"colecovision", "coleco"},
     {"intellivision", "intv"},
@@ -454,9 +462,36 @@ class RemoteBrowserScreen:
                             "this folder - can't copy here.")
             return
         dest = Path(ctx["path"])
+        # Safety: never write into Pocket Curator's own port directory.
+        # A misparsed or relative es_systems <path> used to resolve
+        # against the cwd and dump fetched games into
+        # roms/ports/pocketcurator; refuse rather than scatter files into
+        # the app (which on some firmwares could even break the next
+        # launch). Require an absolute destination outside the port dir.
+        try:
+            port_dir = Path(self.app.port_dir).resolve()
+            dest_res = dest.resolve()
+            in_port = (dest_res == port_dir
+                       or port_dir in dest_res.parents)
+        except (OSError, ValueError):
+            in_port = False
+        if not dest.is_absolute() or in_port:
+            print(f"[fetch] REFUSING copy: destination '{dest}' for system "
+                  f"'{ctx.get('shortname')}' is not a valid roms folder "
+                  f"(absolute={dest.is_absolute()}, in_port={in_port}).")
+            self._toastline(
+                "Can't copy: this system's folder didn't resolve to a "
+                "real location on your device. Nothing was copied.",
+                5000)
+            return
         # ONE queue for the whole session; every job carries its own
         # destination, so marking more games mid-copy - same system or
         # a different one - just grows the queue and the progress bar.
+        src_url = getattr(self.client, "base_url", None) or getattr(
+            self.client, "url", "?")
+        print(f"[fetch] start: server={src_url} system='{ctx['shortname']}' "
+              f"display='{ctx['display']}' dest={dest} "
+              f"with_media={with_media} skip_existing={skip_existing}")
         q = getattr(self.app, "fetch_queue", None)
         if q is None:
             q = FetchQueue(self.client, dest,

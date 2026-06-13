@@ -2,6 +2,59 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.6] - 2026-06-13
+
+### CRITICAL: fetch destination resolution (Batocera/Knulli)
+- Fetched games were landing in roms/ports/pocketcurator (the app's
+  own folder) instead of the system's roms folder. Cause: Batocera and
+  Knulli write es_systems.cfg <path> entries as "%ROMPATH%/amiga500"
+  or "./snes", which Pocket Curator left relative - so they resolved
+  against the working directory (the port dir). Pocket Curator now
+  expands %ROMPATH% and anchors any relative path to the device's roms
+  directory, so destinations are always absolute and correct.
+- Added a hard safety guard: Pocket Curator will REFUSE to copy if a
+  destination doesn't resolve to a real, absolute folder outside its
+  own port directory, rather than scatter files into itself. This also
+  removes the most likely cause of a boot-loop seen after fetching on
+  one device - writing into the running app's directory.
+- Amiga family aliases added (amiga <-> amiga500/amiga1200/amigacdtv),
+  so a remote "amiga" folder resolves to whichever Amiga system the
+  device actually has. Fixes the fetch screen showing "/amiga/ ->
+  Amiga" against a non-existent roms/amiga folder on Batocera/Knulli.
+
+### Ghost systems (Batocera)
+- Batocera ships a few stock gamelist entries whose ROM files don't
+  exist (Megadrive "Old Towers", PCEngine "Reflectron"/"Santatlanean",
+  and single-game ports). They made empty systems look populated, then
+  showed nothing on entry. gamelist.xml remains the source of truth for
+  normal systems, but a SMALL system (<=5 games) is now confirmed by
+  checking that at least one listed ROM exists on disk; if none do, the
+  system is treated as empty and not shown. Large libraries skip the
+  check (no per-file cost).
+
+### Fetch confirmation
+- The "calculating file sizes" prompt no longer sticks: once sizing
+  finishes, pressing A starts the copy immediately - you no longer have
+  to move off the menu item and back. Message reworded to "Please wait
+  while calculating file sizes...".
+
+### Fetch logging
+- The log now records the server, system, and destination at the start
+  of a copy, then each job and each file copied (source -> destination,
+  size), so fetch issues can actually be diagnosed.
+
+### Updated
+- Pocket Curator's own store description now reflects the fetch feature
+  (copy as well as delete, WebDAV). Installs with the old description
+  are updated automatically on the next metadata write.
+
+### Notes
+- dArkOS logos confirmed fixed in 1.0.5 (SNES/NES/Genesis correct).
+- A boot-loop after fetching was reported on one ROCKNIX device; its
+  most likely cause (files written into the port dir) is addressed by
+  the destination fix + guard above, but couldn't be reproduced from a
+  log. Please report if it recurs with 1.0.6.
+
 ## [1.0.5] - 2026-06-13
 
 ### Fixed: theme logos (dArkOS + Batocera)

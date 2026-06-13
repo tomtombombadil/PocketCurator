@@ -78,6 +78,11 @@ class RemoteConfirmScreen(_MenuScreen):
             total = 0
         self.media_bytes = max(0, total)
         self._sizing = False
+        # Clear the "please wait" prompt the moment sizing is done, so
+        # the next A press starts the copy without the user having to
+        # move off the menu item and back to "reset" it.
+        if self.status.startswith("Please wait while calculating"):
+            self.status = ""
         self._rebuild_items()
 
     def _needed(self, with_media: bool) -> int:
@@ -98,7 +103,7 @@ class RemoteConfirmScreen(_MenuScreen):
         # Block the scrapings copy until media sizes are known, so we
         # never start a copy we haven't size/fit-checked.
         if with_media and (self._sizing or self.media_bytes is None):
-            self.status = "Still calculating file sizes - one moment..."
+            self.status = "Please wait while calculating file sizes..."
             return
         if not self._fits(with_media):
             self.status = (f"NOT ENOUGH SPACE - that copy needs "
@@ -119,7 +124,8 @@ class RemoteConfirmScreen(_MenuScreen):
         # in sync (Calculating... -> real size) each frame.
         if self._sizing:
             self._rebuild_items()
-        if not self.status.startswith("NOT ENOUGH") and not self.status.startswith("Still calculating"):
+        if (not self.status.startswith("NOT ENOUGH")
+                and not self.status.startswith("Please wait while calculating")):
             bits = []
             if self.existing:
                 bits.append(f"{len(self.existing)} of these are already "

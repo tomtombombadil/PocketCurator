@@ -172,6 +172,10 @@ class FetchQueue:
                 self._snap.job_index += 1
                 self._snap.job_title = job.title
                 self._snap.error = ""
+            jdest_log = Path(job.dest_dir) if job.dest_dir else self.dest_dir
+            print(f"[fetch] job {self._snap.job_index}/{self._snap.job_count}: "
+                  f"'{job.title}' -> {jdest_log}  "
+                  f"(rom + {len(job.media)} media file(s))")
 
             try:
                 jdest = Path(job.dest_dir) if job.dest_dir else self.dest_dir
@@ -199,6 +203,7 @@ class FetchQueue:
                     continue
 
     def _copy_one(self, href: str, dest: Path, size: int) -> None:
+        print(f"[fetch]   copy {href}  ->  {dest}  ({size} bytes)")
         def on_progress(done: int, total: int) -> None:
             now = time.monotonic()
             with self._lock:

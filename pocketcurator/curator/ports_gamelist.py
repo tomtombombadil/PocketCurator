@@ -46,11 +46,13 @@ OUR_FIELDS: "dict[str, str]" = {
     "name": "Pocket Curator",
     "desc": (
         "Pocket Curator uses an Emulation Station-like interface "
-        "allowing you to visually delete games and whole systems with "
-        "no PC required! You can see the screenshot, description, "
-        "rating, genre, and origin of the game. Letting you make "
-        "informed decisions before deleting. It lets you curate your "
-        "collection right from the convenience of your device."
+        "allowing you to visually copy and delete games and whole "
+        "systems without removing your SD card. You can see the "
+        "screenshot, description, rating, genre, and origin of the "
+        "game. Letting you make informed decisions before copying or "
+        "deleting. It lets you curate your collection right from the "
+        "convenience of your device. Connect to WebDAV servers to copy "
+        "games direct to your device!"
     ),
     "genre": "Various, Utilities",
     "developer": "tomtombombadil",
