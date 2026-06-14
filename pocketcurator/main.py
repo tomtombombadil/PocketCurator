@@ -37,37 +37,70 @@ def main() -> int:
     app = App(port_dir=here)
     rc = app.run()
 
-    # If the user deleted ROMs, EmulationStation's in-RAM gamelists are now
-    # stale, so leave a flag asking the launcher to refresh ES on exit
-    # (an in-place reload). If nothing was deleted, no flag is written and
-    # the launcher exits cleanly with no refresh.
+    # --- Pocket Curator's own metadata (description, artwork, ...) ---
     #
-    # Self-registration: if our own entry is missing or incomplete in the
-    # ports gamelist (fresh manual install, or a firmware that rebuilt its
-    # lists), ask the launcher to run the metadata installer. Its deferred
-    # write + refresh also picks up this session's deletions, so 'register'
-    # supersedes 'deletions'. The write itself must NOT happen here: ES
-    # rewrites our node from its in-RAM copy on its game-exit flush, so
-    # only the deferred/ES-down write sticks.
+    # PROVEN mechanism (do not "improve" this into a deferred post-exit
+    # write again): write our metadata to disk HERE, while we are still
+    # running, then immediately tell the running EmulationStation to
+    # reload gamelists from disk. ES treats our port as a "game"; when our
+    # window closes it flushes the ports gamelist from its in-RAM model
+    # (bumping playcount/lastplayed), which would clobber a write that
+    # only exists on disk. By reloading NOW, ES pulls our metadata into
+    # its RAM first, so that exit-time flush writes our metadata BACK
+    # instead of overwriting it. A post-exit write/reload (the launcher or
+    # a deferred script) runs AFTER that flush and is too late - that was
+    # the regression that made the description stop updating.
+    wrote_metadata = False        # did we write our metadata to disk?
+    metadata_reloaded = False      # did the running ES adopt it (API)?
     try:
+        from curator.ports_gamelist import entry_needs_metadata, ensure_entry
+        if entry_needs_metadata(here.parent):
+            ensure_entry(ports_dir=here.parent)
+            wrote_metadata = True
+            # The in-app reload is what makes the write stick (see above).
+            # API firmwares (Batocera/ROCKNIX/Knulli) -> True, done.
+            # ArkOS-family (dArkOS) has no API -> False, so the launcher's
+            # on-exit ArkOS ES-restart path must register it instead.
+            metadata_reloaded = _reload_running_es()
+    except Exception:
+        pass
+
+    # Tell the launcher what to do on exit:
+    #   register  -> we wrote metadata but couldn't reload it in-app
+    #                (dArkOS): the launcher writes+restarts ES so it
+    #                re-reads the gamelist. Its refresh also covers any
+    #                deletions/fetches this session.
+    #   deletions -> only ROM changes to surface (metadata already safe in
+    #                ES's RAM via the in-app reload, or nothing to write).
+    try:
+        changed = (bool(getattr(app, "deletions_occurred", False))
+                   or bool(getattr(app, "fetches_occurred", False)))
         reason = ""
-        if bool(getattr(app, "deletions_occurred", False)) \
-                or bool(getattr(app, "fetches_occurred", False)):
-            # Fetched games are new files ES hasn't seen; the same
-            # reload that surfaces deletions surfaces them.
+        if wrote_metadata and not metadata_reloaded:
+            reason = "register"
+        elif changed:
             reason = "deletions"
-        try:
-            from curator.ports_gamelist import entry_needs_metadata
-            if entry_needs_metadata(here.parent):
-                reason = "register"
-        except Exception:
-            pass
         if reason:
             (here / ".es_refresh_needed").write_text(reason, encoding="utf-8")
     except Exception:
         pass
 
     return rc
+
+
+def _reload_running_es(timeout: float = 8.0) -> bool:
+    """Ask the running EmulationStation to reload gamelists from disk
+    (no restart). Best-effort; returns True on success. This is the local
+    ES HTTP API that Batocera/ROCKNIX/Knulli expose (the same one
+    PortMaster uses). Firmwares without it (e.g. dArkOS) simply get False
+    and fall back to the launcher's on-exit refresh."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(
+                "http://localhost:1234/reloadgames", timeout=timeout):
+            return True
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

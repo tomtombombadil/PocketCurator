@@ -2,6 +2,29 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.10] - 2026-06-13
+
+### Fixed (for real): Pocket Curator's description not updating
+- Restored the PROVEN mechanism we'd worked out before and since lost.
+  The description (and our other managed fields) are now written to disk
+  and then reloaded into the RUNNING EmulationStation - in-app, before
+  Pocket Curator exits. ES treats our port as a "game" and flushes the
+  ports gamelist from RAM to disk when our window closes; that flush was
+  clobbering a disk-only write. Reloading while we're still running pulls
+  our metadata into ES's RAM first, so the exit flush writes it back
+  instead of overwriting it. The previous builds deferred the
+  write+reload to AFTER exit, which is after the flush - too late. That
+  was the regression.
+- On firmwares without the reload API (dArkOS/ArkOS family), the write
+  still happens in-app and the launcher's existing ES-restart path
+  registers it on exit.
+
+### Fixed: dArkOS exit garbage text
+- After a fetch/metadata run, PortMaster's cleanup prints "Killed"
+  job-control notices to the console as it stops gptokeyb/pugwash. The
+  console is now cleared once more after cleanup on ArkOS-family, so
+  you're handed back a clean screen instead of that leftover text.
+
 ## [1.0.9] - 2026-06-13
 
 ### Fixed: pre-release update check crashed the app

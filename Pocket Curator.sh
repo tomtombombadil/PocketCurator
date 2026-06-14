@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.9
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.10
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -882,6 +882,17 @@ if [ -f "$GAMEDIR/.es_refresh_needed" ]; then
 fi
 
 pm_finish
+
+# ArkOS-family prints PortMaster's "Killed" job-control notices to tty1
+# as it pkills gptokeyb/pugwash during cleanup - harmless but ugly
+# leftover text on screen as ES comes back. Clear the console once more
+# after cleanup so the user is handed back a clean screen.
+case "${CFW_NAME,,}" in
+  arkos*|darkos*)
+    [ -w /dev/tty1 ] && printf '\033c' > /dev/tty1 2>/dev/null
+    ;;
+esac
+
 exit "${APP_EXIT:-0}"
 
 } # Added by Tom to force bash to load this whole script into RAM
