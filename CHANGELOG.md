@@ -2,6 +2,29 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.11] - 2026-06-14
+
+### Fixed (proven on-device): description not updating on dArkOS
+- Root cause, confirmed with an on-device probe: EmulationStation does
+  NOT rewrite the gamelist while it sits at its menu - a write there is
+  durable. The clobber happens at ONE moment: ES's game-exit flush,
+  when it returns from running Pocket Curator and writes its in-RAM copy
+  (with the old description) back to disk. On firmwares with the reload
+  API (ROCKNIX/Knulli/Batocera) the in-app reload pulls our write into
+  ES's RAM before that flush, so it sticks. dArkOS has no reload API, so
+  the in-app write was always clobbered by the flush.
+- Fix: on a no-API firmware, when our metadata needs updating, the
+  launcher now writes it during an ES-DOWN window (stop ES -> write ->
+  start ES) instead of the old register path that wrote while ES could
+  still flush over it. Writing while ES is stopped means there is no
+  in-RAM copy to clobber it. The on-device probe proved this method
+  makes the new description stick on dArkOS.
+- Routing: a description/metadata update with no reload API now uses the
+  launcher's 'metadata' (or 'both', if there were also deletions/
+  fetches) path, which already implemented the down-window stop/write/
+  start via systemd-run on ArkOS-family. API firmwares are unchanged
+  (they reload in-app and were already working).
+
 ## [1.0.10] - 2026-06-13
 
 ### Fixed (for real): Pocket Curator's description not updating

@@ -66,18 +66,23 @@ def main() -> int:
         pass
 
     # Tell the launcher what to do on exit:
-    #   register  -> we wrote metadata but couldn't reload it in-app
-    #                (dArkOS): the launcher writes+restarts ES so it
-    #                re-reads the gamelist. Its refresh also covers any
-    #                deletions/fetches this session.
-    #   deletions -> only ROM changes to surface (metadata already safe in
-    #                ES's RAM via the in-app reload, or nothing to write).
+    #   metadata / both -> we wrote our metadata but couldn't reload it
+    #       in-app (no API, i.e. dArkOS). The launcher's metadata path
+    #       does a stop -> write-while-ES-is-DOWN -> start. Writing while
+    #       ES is stopped is the ONLY thing that sticks on dArkOS: at idle
+    #       the write survives, but ES's game-exit flush (RAM -> disk)
+    #       clobbers a write made while ES is up. Proven on-device with
+    #       the down-window probe. 'both' when there are also ROM changes.
+    #   deletions -> only ROM changes to surface (our metadata is already
+    #       safe in ES's RAM via the in-app reload, or nothing to write).
     try:
         changed = (bool(getattr(app, "deletions_occurred", False))
                    or bool(getattr(app, "fetches_occurred", False)))
         reason = ""
         if wrote_metadata and not metadata_reloaded:
-            reason = "register"
+            # Down-window rewrite needed (dArkOS). 'both' also refreshes
+            # for this session's deletions/fetches in the same restart.
+            reason = "both" if changed else "metadata"
         elif changed:
             reason = "deletions"
         if reason:
