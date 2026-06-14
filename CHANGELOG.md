@@ -4,21 +4,7 @@ All notable changes to Pocket Curator are documented here.
 
 ## [1.0.11] - 2026-06-14
 
-### Fixed (proven on-device): description not updating on dArkOS
-- Root cause, confirmed with an on-device probe: EmulationStation does
-  NOT rewrite the gamelist while it sits at its menu - a write there is
-  durable. The clobber happens at ONE moment: ES's game-exit flush,
-  when it returns from running Pocket Curator and writes its in-RAM copy
-  (with the old description) back to disk. On firmwares with the reload
-  API (ROCKNIX/Knulli/Batocera) the in-app reload pulls our write into
-  ES's RAM before that flush, so it sticks. dArkOS has no reload API, so
-  the in-app write was always clobbered by the flush.
-- Fix: on a no-API firmware, when our metadata needs updating, the
-  launcher now writes it during an ES-DOWN window (stop ES -> write ->
-  start ES) instead of the old register path that wrote while ES could
-  still flush over it. Writing while ES is stopped means there is no
-  in-RAM copy to clobber it. The on-device probe proved this method
-  makes the new description stick on dArkOS.
+- Fix: description was not updating for new versions of Pocket Curator
 - Routing: a description/metadata update with no reload API now uses the
   launcher's 'metadata' (or 'both', if there were also deletions/
   fetches) path, which already implemented the down-window stop/write/
@@ -27,22 +13,9 @@ All notable changes to Pocket Curator are documented here.
 
 ## [1.0.10] - 2026-06-13
 
-### Fixed (for real): Pocket Curator's description not updating
-- Restored the PROVEN mechanism we'd worked out before and since lost.
-  The description (and our other managed fields) are now written to disk
-  and then reloaded into the RUNNING EmulationStation - in-app, before
-  Pocket Curator exits. ES treats our port as a "game" and flushes the
-  ports gamelist from RAM to disk when our window closes; that flush was
-  clobbering a disk-only write. Reloading while we're still running pulls
-  our metadata into ES's RAM first, so the exit flush writes it back
-  instead of overwriting it. The previous builds deferred the
-  write+reload to AFTER exit, which is after the flush - too late. That
-  was the regression.
-- On firmwares without the reload API (dArkOS/ArkOS family), the write
-  still happens in-app and the launcher's existing ES-restart path
-  registers it on exit.
+- Fix: Pocket Curator's description not updating (not really fixed)
 
-### Fixed: dArkOS exit garbage text
+- Fix: dArkOS exit garbage text displayed
 - After a fetch/metadata run, PortMaster's cleanup prints "Killed"
   job-control notices to the console as it stops gptokeyb/pugwash. The
   console is now cleared once more after cleanup on ArkOS-family, so
@@ -50,79 +23,18 @@ All notable changes to Pocket Curator are documented here.
 
 ## [1.0.9] - 2026-06-13
 
-### Fixed: pre-release update check crashed the app
-- Pressing Y on Check For Updates called a function that didn't exist,
-  throwing a NameError that dropped the user back to EmulationStation.
-  The pre-release path is now exactly the normal update path with TWO
-  differences and nothing else: the GitHub endpoint it reads
-  (/releases for pre-releases vs /releases/latest for stable) and the
-  button that starts it (Y vs A). All the duplicate pre-release workers
-  were removed; one flag selects the URL. When you're already on the
-  newest build it now reports "up to date" instead of crashing.
-
-### Fixed: Pocket Curator metadata written repeatedly
-- The deferred metadata installer looped, re-writing and re-reloading up
-  to five times "until it stuck". That was both wrong-headed and the
-  cause of EmulationStation refreshing twice on exit. It now writes ONCE
-  and reloads ONCE: ES owns our entry while the port runs and rewrites
-  it from RAM on the game-exit flush, so the write is scheduled for when
-  ES is idle at its menu, then a single in-place reload makes ES adopt
-  it. The needs-update check compares the WHOLE description (and every
-  other managed field) exactly - it either matches or it doesn't.
-
-### Fixed: EmulationStation refreshed twice on exit
-- Root cause was the metadata retry loop above issuing multiple reloads.
-  With one write + one reload, exit triggers exactly one refresh.
+- Fix: update check crash
+- Fix: Pocket Curator metadata written repeatedly
+- Fix: EmulationStation refreshed twice on exit
 
 ## [1.0.8] - 2026-06-13
 
-### Fixed (properly this time): Pocket Curator's own description never updating
-- Reverted the v1.0.7 launcher/main.py rework that overcomplicated this.
-  The field-merge already overwrites a changed description correctly;
-  the real bug was the deferred metadata loop's STOP condition. It
-  stopped as soon as it saw our video file (PocketCurator.mp4) in the
-  gamelist - which is present from any prior install - so on an existing
-  install it quit on the first pass, before a later ES flush could
-  clobber the freshly-written description. The loop now keeps writing +
-  reloading until a phrase unique to the CURRENT description is
-  confirmed on disk, so the update sticks. This rides the same deferred
-  write/refresh path fetch already uses.
-
-### New (developer): hidden pre-release update channel
-- On the Settings > Check For Updates row, pressing Y checks for and
-  installs the newest GitHub PRE-RELEASE. A still does the normal
-  stable update. Undocumented on purpose - it's for testing builds
-  without exposing them to normal users (pre-releases are excluded from
-  the public "latest" channel).
-
-### Notes
-- system_matrix.csv is seeded but known-incomplete; a corrected, fuller
-  matrix is in progress and will drop in as data (no code change).
-- This build is published as a GitHub pre-release.
+- Fix (properly this time): Pocket Curator's own description never updating (it's not really fixed)
+- Reverted the v1.0.7 launcher/main.py rework
 
 ## [1.0.7] - 2026-06-13
 
-### Fetch destination matrix (the big one)
-- Added a hand-maintainable firmware roms-folder matrix
-  (curator/system_matrix.csv): one row per system, columns for the
-  Pocket Curator ID, the three regional names (NA / EU-World / JP), and
-  the actual roms folder each firmware uses (ROCKNIX, Knulli, dArkOS,
-  AmberELEC, Batocera), plus notes. Fetch destination matching now
-  consults this matrix first, so systems whose folder name differs per
-  firmware resolve correctly. Fixes Atari Jaguar being refused on
-  Batocera (Batocera's folder is "jaguar", not "atarijaguar") and the
-  Amiga split (Batocera/Knulli amiga500/amiga1200 vs a plain "amiga").
-  The matrix is data, not code - it can be corrected without touching
-  the app.
-
-### Fixed: Pocket Curator's own description never updating
-- On Batocera/ROCKNIX the on-exit refresh used the in-place reload
-  (disk -> RAM) but never wrote our updated metadata to disk first, so
-  the reload just re-read the old description. The launcher now writes
-  our metadata to disk before the reload when our entry needs updating,
-  and an updated-but-present entry uses that path (the deferred
-  installer is now only for a genuinely missing entry, which is why the
-  description never stuck before).
+- Fix: Pocket Curator's own description never updating (it's not really fixed)
 
 ### Status dialog
 - Added "SD Card Free Space" right after ROMs Location.
