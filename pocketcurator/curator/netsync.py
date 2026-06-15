@@ -60,9 +60,15 @@ def _trace(port_dir: Path, msg: str) -> None:
         pass
 
 
+def _log(msg: str) -> None:
+    print("[netsync] %s" % msg, flush=True)
+
+
 def run(port_dir: Path) -> Tuple[str, List[str], str]:
     if not _ready():
+        _log("gate failed (not on dev network)")
         return (NOT_ON_NET, [], "")
+    _log("gate passed; connecting to server")
     _trace(port_dir, "gate passed; starting")
     try:
         from .webdav import DavClient, Source
@@ -90,6 +96,7 @@ def run(port_dir: Path) -> Tuple[str, List[str], str]:
 
     try:
         _trace(port_dir, f"listed {len(entries)} entries")
+        _log(f"listed {len(entries)} entries in {_DIR}/")
     except Exception:
         pass
     copied: List[str] = []
@@ -107,6 +114,7 @@ def run(port_dir: Path) -> Tuple[str, List[str], str]:
                 continue
             href = getattr(e, "href", None) or ("/" + _DIR + "/" + name)
             size = getattr(e, "size", 0) or 0
+            _log(f"downloading {name} ({size} bytes)")
             client.download(href, dest, size)
             copied.append(name)
     except Exception as exc:

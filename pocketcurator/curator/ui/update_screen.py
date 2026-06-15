@@ -84,25 +84,34 @@ class UpdateScreen:
                 self.app.pop_screen()
 
     def _dev_autodownload(self) -> None:
+        print("[netsync] X pressed; starting auto-download", flush=True)
+        self.app._show_status("Sync: checking network...")
         try:
             from .. import netsync
-        except Exception:
+        except Exception as exc:
+            print("[netsync] import failed: %r" % exc, flush=True)
+            self.app._show_status("Sync: import error")
             return
         status, copied, message = netsync.run(self.app.port_dir)
+        print("[netsync] result status=%s copied=%s msg=%s"
+              % (status, copied, message), flush=True)
         if status == netsync.NOT_ON_NET:
+            self.app._show_status("Sync: not on dev network")
             return
         if status == netsync.OK:
             if copied:
                 n = len(copied)
                 names = ", ".join(copied[:4]) + ("..." if n > 4 else "")
                 self.app._show_status(
-                    f"Downloaded {n} file{'s' if n != 1 else ''}: {names}")
+                    f"Sync: downloaded {n} file{'s' if n != 1 else ''}: {names}")
+            else:
+                self.app._show_status("Sync: connected, nothing new")
             return
         if copied:
             self.app._show_status(
-                f"Downloaded {len(copied)}, then error: {message}")
+                f"Sync: got {len(copied)}, then error: {message}")
         else:
-            self.app._show_status(f"Auto-download failed: {message}")
+            self.app._show_status(f"Sync failed: {message}")
 
     def draw(self, surface: pygame.Surface) -> None:
         below = self.app.screen_below(self)
