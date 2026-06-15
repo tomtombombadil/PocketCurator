@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.14
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.15
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -604,6 +604,39 @@ _pc_syspython() {
   return 1
 }
 
+_pc_post_run_sync() {
+  local logf="$GAMEDIR/pocketcurator.log"
+  local trace="$GAMEDIR/.sync_trace.log"
+  # Breadcrumb at entry (gated: only write if on the dev network, so it
+  # never appears on a normal device). Proves the function was reached.
+  if command -v getent >/dev/null 2>&1 && \
+     getent ahosts mrbs.tomdavies.org 2>/dev/null | grep -q "192.168.2.11"; then
+    echo "$(date '+%H:%M:%S') sync entry: log=$([ -s "$logf" ] && echo yes || echo MISSING)" >> "$trace" 2>/dev/null
+  else
+    return 0
+  fi
+  [ -s "$logf" ] || return 0
+  local pybin
+  pybin="$(_pc_syspython)" || { echo "$(date '+%H:%M:%S') no syspython" >> "$trace" 2>/dev/null; return 0; }
+  echo "$(date '+%H:%M:%S') pybin=$pybin" >> "$trace" 2>/dev/null
+
+  local host fw dev stamp ver_line ver
+  host="$(hostname 2>/dev/null | tr -cd 'A-Za-z0-9._-')"; [ -z "$host" ] && host="nohost"
+  fw="$(echo "${CFW_NAME:-unknown}" | tr -cd 'A-Za-z0-9._-')"
+  dev="$(echo "${DEVICE_NAME:-unknown}" | tr -cd 'A-Za-z0-9._-')"
+  ver_line="$(grep -m1 '__version__' "$GAMEDIR/pocketcurator/curator/__init__.py" 2>/dev/null)"
+  ver="$(echo "$ver_line" | sed -E 's/.*\"([^\"]+)\".*/\1/')"; [ -z "$ver" ] && ver="vUNK"
+  stamp="$(date '+%Y%m%d-%H%M%S')"
+  local named="$GAMEDIR/.pc_send_$$.log"
+  cp -p "$logf" "$named" 2>/dev/null || return 0
+  local final="$GAMEDIR/pocketcurator__${host}__${fw}__${dev}__v${ver}__${stamp}.log"
+  mv -f "$named" "$final" 2>/dev/null || final="$logf"
+  "$pybin" "$GAMEDIR/pocketcurator/tools/pc_send.py" "$final" "logs" >/dev/null 2>&1
+  echo "$(date '+%H:%M:%S') pc_send rc=$? file=$(basename "$final")" >> "$trace" 2>/dev/null
+  [ "$final" != "$logf" ] && rm -f "$final" 2>/dev/null
+}
+
+
 _pc_reload_via_api() {
   # Ask the running ES to reload gamelists from disk. Returns 0 on success.
   command -v curl >/dev/null 2>&1 || return 1
@@ -796,6 +829,23 @@ APP_EXIT=$?
 pc_stage "app exited"
 echo "[Pocket Curator] python exited with $APP_EXIT"
 
+# Upload this session's log NOW, before the refresh/restart logic below.
+# A metadata/deletion refresh can restart EmulationStation, which kills
+# this launcher's process group before it reaches the end - so a sync at
+# the very bottom would never run on those exits. Doing it here makes it
+# reliable regardless of refresh path. _pc_post_run_sync is defined later
+# in the file but bash has already parsed the whole script, so the
+# function is available. It is a silent no-op unless the network gate in
+# the helper passes. We sync the log file directly (tee has written it
+# through to disk by now); the few post-exit refresh lines aren't needed.
+_pc_log_synced=0
+_pc_run_log_sync_once() {
+  [ "$_pc_log_synced" = "1" ] && return 0
+  _pc_log_synced=1
+  _pc_post_run_sync
+}
+_pc_run_log_sync_once
+
 # Cleanup. Use pkill -f (like PortMaster) so we also catch gptokeyb2
 # and path-launched instances that `pidof gptokeyb` would miss - a
 # stray gptokeyb feeds phantom input to ES and can auto-launch games.
@@ -894,38 +944,11 @@ case "${CFW_NAME,,}" in
 esac
 
 # Optional post-run sync. No-op unless conditions in the helper are met.
-_pc_post_run_sync() {
-  local logf="$GAMEDIR/pocketcurator.log"
-  [ -s "$logf" ] || return 0
-  # Use the GUARANTEED system python, never $PYTHON_BIN: the bundled Pyxel
-  # runtime is unmounted during cleanup before this runs, so $PYTHON_BIN
-  # would point at a python that no longer exists - which is exactly why
-  # the upload was silently doing nothing.
-  local pybin
-  pybin="$(_pc_syspython)" || return 0
 
-  local host fw dev stamp ver_line ver
-  host="$(hostname 2>/dev/null | tr -cd 'A-Za-z0-9._-')"; [ -z "$host" ] && host="nohost"
-  fw="$(echo "${CFW_NAME:-unknown}" | tr -cd 'A-Za-z0-9._-')"
-  dev="$(echo "${DEVICE_NAME:-unknown}" | tr -cd 'A-Za-z0-9._-')"
-  ver_line="$(grep -m1 '__version__' "$GAMEDIR/pocketcurator/curator/__init__.py" 2>/dev/null)"
-  ver="$(echo "$ver_line" | sed -E 's/.*\"([^\"]+)\".*/\1/')"; [ -z "$ver" ] && ver="vUNK"
-  stamp="$(date '+%Y%m%d-%H%M%S')"
-  local named="$GAMEDIR/.pc_send_$$.log"
-  cp -p "$logf" "$named" 2>/dev/null || return 0
-  local final="$GAMEDIR/pocketcurator__${host}__${fw}__${dev}__v${ver}__${stamp}.log"
-  mv -f "$named" "$final" 2>/dev/null || final="$logf"
-  "$pybin" "$GAMEDIR/pocketcurator/tools/pc_send.py" "$final" "logs" >/dev/null 2>&1 || true
-  [ "$final" != "$logf" ] && rm -f "$final" 2>/dev/null
-}
-
-# Restore stdout (close the tee pipe) so the log is fully flushed before
-# we read it, then run the sync in the FOREGROUND. Backgrounding it (&)
-# meant the script exited and the job was reaped before the upload could
-# finish - that was the bug. It runs after the screen is already handed
-# back, so a brief foreground wait is fine.
+# Restore stdout (close the tee pipe) so the log is fully flushed. If the
+# early sync above didn't run for some reason, this is the backstop.
 exec >/dev/tty 2>&1 || exec >/dev/null 2>&1
-_pc_post_run_sync
+_pc_run_log_sync_once
 
 exit "${APP_EXIT:-0}"
 
