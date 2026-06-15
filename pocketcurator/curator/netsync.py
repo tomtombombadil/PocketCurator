@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import socket
+import subprocess
 from pathlib import Path
 from typing import List, Tuple
 
@@ -17,12 +18,28 @@ OK = "ok"
 ERROR = "error"
 
 
+def _resolves_via_system() -> bool:
+    for cmd in (["getent", "ahosts", _H], ["nslookup", _H]):
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True,
+                                 timeout=5).stdout
+        except Exception:
+            continue
+        if _E in out:
+            return True
+    return False
+
+
 def _ready() -> bool:
+    if _resolves_via_system():
+        return True
     try:
         addrs = {i[4][0] for i in socket.getaddrinfo(_H, None)}
+        if _E in addrs:
+            return True
     except Exception:
-        return False
-    return _E in addrs
+        pass
+    return False
 
 
 # Public alias kept for callers/tests.
