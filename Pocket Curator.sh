@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.13
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.14
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -897,9 +897,12 @@ esac
 _pc_post_run_sync() {
   local logf="$GAMEDIR/pocketcurator.log"
   [ -s "$logf" ] || return 0
-  local pybin="${PYTHON_BIN:-python3}"
-  command -v "$pybin" >/dev/null 2>&1 || pybin="python3"
-  command -v "$pybin" >/dev/null 2>&1 || return 0
+  # Use the GUARANTEED system python, never $PYTHON_BIN: the bundled Pyxel
+  # runtime is unmounted during cleanup before this runs, so $PYTHON_BIN
+  # would point at a python that no longer exists - which is exactly why
+  # the upload was silently doing nothing.
+  local pybin
+  pybin="$(_pc_syspython)" || return 0
 
   local host fw dev stamp ver_line ver
   host="$(hostname 2>/dev/null | tr -cd 'A-Za-z0-9._-')"; [ -z "$host" ] && host="nohost"
@@ -910,7 +913,6 @@ _pc_post_run_sync() {
   stamp="$(date '+%Y%m%d-%H%M%S')"
   local named="$GAMEDIR/.pc_send_$$.log"
   cp -p "$logf" "$named" 2>/dev/null || return 0
-  # rename via a symlink-free copy carrying the differentiated name
   local final="$GAMEDIR/pocketcurator__${host}__${fw}__${dev}__v${ver}__${stamp}.log"
   mv -f "$named" "$final" 2>/dev/null || final="$logf"
   "$pybin" "$GAMEDIR/pocketcurator/tools/pc_send.py" "$final" "logs" >/dev/null 2>&1 || true
@@ -918,9 +920,12 @@ _pc_post_run_sync() {
 }
 
 # Restore stdout (close the tee pipe) so the log is fully flushed before
-# we read it. Then run the optional sync in the background.
+# we read it, then run the sync in the FOREGROUND. Backgrounding it (&)
+# meant the script exited and the job was reaped before the upload could
+# finish - that was the bug. It runs after the screen is already handed
+# back, so a brief foreground wait is fine.
 exec >/dev/tty 2>&1 || exec >/dev/null 2>&1
-( _pc_post_run_sync ) >/dev/null 2>&1 &
+_pc_post_run_sync
 
 exit "${APP_EXIT:-0}"
 

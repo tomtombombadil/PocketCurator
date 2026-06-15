@@ -85,7 +85,6 @@ def main():
     try:
         import http.client
         conn = http.client.HTTPConnection(_HOST, _PORT, timeout=6)
-        # Try a plain GET of the folder (autoindex) first - simplest signal.
         conn.request("GET", "/download/")
         r = conn.getresponse()
         body = r.read()
@@ -93,6 +92,18 @@ def main():
         conn.close()
     except Exception as exc:
         line("   GET /download/ FAILED: %r" % exc)
+    # PROPFIND is what the app's WebDAV listing uses by default; if the
+    # server rejects it, the app now falls back to the GET listing above.
+    try:
+        import http.client
+        conn = http.client.HTTPConnection(_HOST, _PORT, timeout=6)
+        conn.request("PROPFIND", "/download/", headers={"Depth": "1"})
+        r = conn.getresponse()
+        body = r.read()
+        line("   PROPFIND /download/ -> HTTP %s, %d bytes" % (r.status, len(body)))
+        conn.close()
+    except Exception as exc:
+        line("   PROPFIND /download/ FAILED: %r" % exc)
     line("")
 
     # 4. Test PUT a tiny file into logs/ (independent of the gate)

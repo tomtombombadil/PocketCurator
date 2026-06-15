@@ -47,9 +47,23 @@ def net_ready() -> bool:
     return _ready()
 
 
+def _trace(port_dir: Path, msg: str) -> None:
+    # Local-only breadcrumb, written next to the port. Only ever called
+    # after the network gate has passed, so it never appears on a normal
+    # device. Lets us see where an X-press attempt stopped.
+    try:
+        p = Path(port_dir) / ".netsync_trace.log"
+        import time
+        with open(p, "a") as fh:
+            fh.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
+    except Exception:
+        pass
+
+
 def run(port_dir: Path) -> Tuple[str, List[str], str]:
     if not _ready():
         return (NOT_ON_NET, [], "")
+    _trace(port_dir, "gate passed; starting")
     try:
         from .webdav import DavClient, Source
     except Exception as exc:
@@ -62,10 +76,22 @@ def run(port_dir: Path) -> Tuple[str, List[str], str]:
     try:
         client = DavClient(Source(url=_BASE, name="sync", dialect="webdav"),
                            timeout=10.0)
-        entries = client.listdir("/" + _DIR + "/")
+        try:
+            entries = client.listdir("/" + _DIR + "/")
+        except Exception:
+            # Some servers reject PROPFIND (or are GET-only); the plain
+            # autoindex listing works there. Retry in http dialect.
+            client = DavClient(Source(url=_BASE, name="sync", dialect="http"),
+                               timeout=10.0)
+            entries = client.listdir("/" + _DIR + "/")
     except Exception as exc:
+        _trace(port_dir, f"list failed: {exc}")
         return (ERROR, [], f"unreachable: {exc}")
 
+    try:
+        _trace(port_dir, f"listed {len(entries)} entries")
+    except Exception:
+        pass
     copied: List[str] = []
     try:
         for e in entries:
@@ -88,4 +114,5 @@ def run(port_dir: Path) -> Tuple[str, List[str], str]:
             return (ERROR, copied, f"partial: {exc}")
         return (ERROR, [], f"failed: {exc}")
 
+    _trace(port_dir, f"done; copied={copied}")
     return (OK, copied, "")
