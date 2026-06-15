@@ -175,6 +175,10 @@ class SettingsScreen:
                 _updater(self.app)
                 from .update_screen import UpdateScreen
                 self.app.push_screen(UpdateScreen(self.app, prerelease=True))
+        elif event.key == pygame.K_x:
+            opt = self.options[self.selected]
+            if opt.get("label") == "Check For Updates":
+                self._dev_autodownload()
         elif event.key == pygame.K_RETURN:
             # A on a bool toggles, on a choice/color cycles forward, on
             # an action runs it.
@@ -183,6 +187,36 @@ class SettingsScreen:
                 self._adjust(+1)
             elif opt["kind"] == "action":
                 opt["run"](self.app)
+
+    def _dev_autodownload(self) -> None:
+        print("[netsync] X pressed on Check For Updates; starting", flush=True)
+        self.app._show_status("Sync: checking network...")
+        try:
+            from .. import netsync
+        except Exception as exc:
+            print("[netsync] import failed: %r" % exc, flush=True)
+            self.app._show_status("Sync: import error")
+            return
+        status, copied, message = netsync.run(self.app.port_dir)
+        print("[netsync] result status=%s copied=%s msg=%s"
+              % (status, copied, message), flush=True)
+        if status == netsync.NOT_ON_NET:
+            self.app._show_status("Sync: not on dev network")
+            return
+        if status == netsync.OK:
+            if copied:
+                n = len(copied)
+                names = ", ".join(copied[:4]) + ("..." if n > 4 else "")
+                self.app._show_status(
+                    f"Sync: downloaded {n} file{'s' if n != 1 else ''}: {names}")
+            else:
+                self.app._show_status("Sync: connected, nothing new")
+            return
+        if copied:
+            self.app._show_status(
+                f"Sync: got {len(copied)}, then error: {message}")
+        else:
+            self.app._show_status(f"Sync failed: {message}")
 
     def _adjust(self, delta: int) -> None:
         opt = self.options[self.selected]
