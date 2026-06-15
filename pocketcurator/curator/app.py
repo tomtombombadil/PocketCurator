@@ -717,15 +717,6 @@ class App:
     def run(self) -> int:
         self.start()
 
-        # Upload the previous session's log (rotated to .last by the
-        # launcher) now that we're fully up - a stable moment, unlike the
-        # exit/cleanup window. Verbose + toast for troubleshooting.
-        try:
-            from .logsync import upload_last
-            upload_last(self.port_dir, self)
-        except Exception as exc:
-            print("[logsync] hook error: %r" % exc, flush=True)
-
         fps_cap = max(15, int(self.config["ui"].get("fps_cap", 30)))
 
         # Enable key repeat so holding a direction keeps moving the

@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.18
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.19
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -158,12 +158,7 @@ CONFDIR="$GAMEDIR/conf"
 mkdir -p "$CONFDIR"
 cd "$GAMEDIR" || exit 1
 
-# Rotate the log: keep last session's log as .last so it can be uploaded
-# once the app is up and running (a stable moment, unlike the fragile
-# exit/cleanup window). Then start a fresh log for this session.
-if [ -f "$GAMEDIR/pocketcurator.log" ]; then
-  mv -f "$GAMEDIR/pocketcurator.log" "$GAMEDIR/pocketcurator.log.last" 2>/dev/null
-fi
+# Fresh log every launch.
 > "$GAMEDIR/pocketcurator.log" && exec > >(tee "$GAMEDIR/pocketcurator.log") 2>&1
 
 # Launcher-phase timing. $SECONDS counts from shell start, so these
