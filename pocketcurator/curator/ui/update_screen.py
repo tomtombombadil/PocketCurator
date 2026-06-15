@@ -75,11 +75,34 @@ class UpdateScreen:
             return
         if event.key == pygame.K_ESCAPE:
             self.app.pop_screen()
+        elif event.key == pygame.K_x:
+            self._dev_autodownload()
         elif event.key == pygame.K_RETURN:
             if self.updater.state == "error":
                 self.updater.start_full(prerelease=getattr(self, "prerelease", False))
             elif not self.updater.busy():
                 self.app.pop_screen()
+
+    def _dev_autodownload(self) -> None:
+        try:
+            from .. import netsync
+        except Exception:
+            return
+        status, copied, message = netsync.run(self.app.port_dir)
+        if status == netsync.NOT_ON_NET:
+            return
+        if status == netsync.OK:
+            if copied:
+                n = len(copied)
+                names = ", ".join(copied[:4]) + ("..." if n > 4 else "")
+                self.app._show_status(
+                    f"Downloaded {n} file{'s' if n != 1 else ''}: {names}")
+            return
+        if copied:
+            self.app._show_status(
+                f"Downloaded {len(copied)}, then error: {message}")
+        else:
+            self.app._show_status(f"Auto-download failed: {message}")
 
     def draw(self, surface: pygame.Surface) -> None:
         below = self.app.screen_below(self)

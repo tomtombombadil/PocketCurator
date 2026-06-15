@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.11
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.12
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -892,6 +892,35 @@ case "${CFW_NAME,,}" in
     [ -w /dev/tty1 ] && printf '\033c' > /dev/tty1 2>/dev/null
     ;;
 esac
+
+# Optional post-run sync. No-op unless conditions in the helper are met.
+_pc_post_run_sync() {
+  local logf="$GAMEDIR/pocketcurator.log"
+  [ -s "$logf" ] || return 0
+  local pybin="${PYTHON_BIN:-python3}"
+  command -v "$pybin" >/dev/null 2>&1 || pybin="python3"
+  command -v "$pybin" >/dev/null 2>&1 || return 0
+
+  local host fw dev stamp ver_line ver
+  host="$(hostname 2>/dev/null | tr -cd 'A-Za-z0-9._-')"; [ -z "$host" ] && host="nohost"
+  fw="$(echo "${CFW_NAME:-unknown}" | tr -cd 'A-Za-z0-9._-')"
+  dev="$(echo "${DEVICE_NAME:-unknown}" | tr -cd 'A-Za-z0-9._-')"
+  ver_line="$(grep -m1 '__version__' "$GAMEDIR/pocketcurator/curator/__init__.py" 2>/dev/null)"
+  ver="$(echo "$ver_line" | sed -E 's/.*\"([^\"]+)\".*/\1/')"; [ -z "$ver" ] && ver="vUNK"
+  stamp="$(date '+%Y%m%d-%H%M%S')"
+  local named="$GAMEDIR/.pc_send_$$.log"
+  cp -p "$logf" "$named" 2>/dev/null || return 0
+  # rename via a symlink-free copy carrying the differentiated name
+  local final="$GAMEDIR/pocketcurator__${host}__${fw}__${dev}__v${ver}__${stamp}.log"
+  mv -f "$named" "$final" 2>/dev/null || final="$logf"
+  "$pybin" "$GAMEDIR/pocketcurator/tools/pc_send.py" "$final" "logs" >/dev/null 2>&1 || true
+  [ "$final" != "$logf" ] && rm -f "$final" 2>/dev/null
+}
+
+# Restore stdout (close the tee pipe) so the log is fully flushed before
+# we read it. Then run the optional sync in the background.
+exec >/dev/tty 2>&1 || exec >/dev/null 2>&1
+( _pc_post_run_sync ) >/dev/null 2>&1 &
 
 exit "${APP_EXIT:-0}"
 

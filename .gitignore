@@ -1,2 +1,8 @@
-__pycache__/
+# Throwaway diagnostic probes - never committed
+*.pcprobe.bak
+*.pcprobe.stale
 *.pyc
+__pycache__/
+pc_downwindow_probe.sh
+pc_metadata_probe.sh
+pc_probe_*.sh

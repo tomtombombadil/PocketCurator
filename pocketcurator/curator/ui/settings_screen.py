@@ -170,9 +170,6 @@ class SettingsScreen:
         elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             self._adjust(+1 if event.key == pygame.K_RIGHT else -1)
         elif event.key == pygame.K_y:
-            # Hidden developer shortcut: Y on the Check For Updates row
-            # runs the SAME update flow against pre-releases. Undocumented
-            # on purpose; every other row ignores Y.
             opt = self.options[self.selected]
             if opt.get("label") == "Check For Updates":
                 _updater(self.app)

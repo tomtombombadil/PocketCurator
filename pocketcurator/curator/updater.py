@@ -40,8 +40,7 @@ from typing import Optional
 
 GITHUB_REPO = "tomtombombadil/PocketCurator"
 API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-# All releases (newest first), including pre-releases. Used by the hidden
-# developer pre-release channel (Y on Check For Updates).
+# All releases (newest first), including pre-releases.
 API_RELEASES = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
 ASSET_RE = re.compile(r"^pocketcurator_port-v[\d.]+\.zip$")
 

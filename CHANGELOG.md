@@ -2,6 +2,10 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.12] - 2026-06-14
+
+- Internal maintenance and tooling. No user-facing changes.
+
 ## [1.0.11] - 2026-06-14
 
 - Fix: description was not updating for new versions of Pocket Curator
