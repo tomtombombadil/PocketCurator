@@ -226,6 +226,19 @@ class SettingsScreen:
                 self.app._show_status(f"Sync failed: {message}")
         finally:
             self._sync_busy = False
+            # The sync blocked the event loop, so pygame's auto-repeat has
+            # been queuing X KEYDOWNs the whole time. Discard that backlog
+            # and swallow X until it's physically released, so we don't
+            # re-run the sync once per queued repeat (which looked like a
+            # multi-minute lockup on slower-WiFi devices).
+            try:
+                import pygame
+                pygame.event.pump()
+                pygame.event.clear(pygame.KEYDOWN)
+                pygame.event.clear(pygame.KEYUP)
+                self.app._swallowed_keys.add(pygame.K_x)
+            except Exception:
+                pass
 
     def _adjust(self, delta: int) -> None:
         opt = self.options[self.selected]

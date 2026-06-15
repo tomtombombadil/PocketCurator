@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.19
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.20
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -158,8 +158,17 @@ CONFDIR="$GAMEDIR/conf"
 mkdir -p "$CONFDIR"
 cd "$GAMEDIR" || exit 1
 
-# Fresh log every launch.
-> "$GAMEDIR/pocketcurator.log" && exec > >(tee "$GAMEDIR/pocketcurator.log") 2>&1
+# Fresh log every launch. Pipe everything through a timestamping filter
+# so every line - launcher echoes AND the Python app's stdout - is
+# prefixed with the wall-clock time. Prefer awk strftime (fast, no
+# per-line subprocess); fall back to a read loop if this awk lacks it.
+> "$GAMEDIR/pocketcurator.log"
+if echo test | awk '{ print strftime("%H:%M:%S") }' >/dev/null 2>&1; then
+  _pc_ts() { awk '{ print strftime("%H:%M:%S")" "$0; fflush() }'; }
+else
+  _pc_ts() { while IFS= read -r _l; do printf '%s %s\n' "$(date +%H:%M:%S)" "$_l"; done; }
+fi
+exec > >(_pc_ts | tee "$GAMEDIR/pocketcurator.log") 2>&1
 
 # Launcher-phase timing. $SECONDS counts from shell start, so these
 # lines bracket everything the in-app [timing] marks can't see: the
