@@ -2,6 +2,10 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.17] - 2026-06-15
+
+- Internal tooling. No user-facing changes.
+
 ## [1.0.16] - 2026-06-15
 
 - Internal tooling fix. No user-facing changes.

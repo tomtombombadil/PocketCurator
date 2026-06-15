@@ -790,6 +790,11 @@ class App:
 
                 # Always forward to the top of the stack
                 top = self._screens[-1]
+                if event.type == pygame.KEYDOWN:
+                    print("[keydbg] key=%s (%s) -> screen=%s"
+                          % (event.key,
+                             pygame.key.name(event.key),
+                             type(top).__name__), flush=True)
                 top.handle_event(event)
                 if self._quit:
                     break
