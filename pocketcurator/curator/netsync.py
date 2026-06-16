@@ -24,10 +24,20 @@ ERROR = "error"
 
 
 def _resolves_via_system() -> bool:
+    # Try Python's own resolver first: it's in-process (no subprocess
+    # spawn) and on most firmwares it sees the system resolver fine. Only
+    # if that comes back without our IP do we shell out - and those calls
+    # are tightly timed because getent ahosts can hang ~15s on some
+    # firmwares doing an AAAA lookup.
+    try:
+        if _E in {i[4][0] for i in socket.getaddrinfo(_H, None)}:
+            return True
+    except Exception:
+        pass
     for cmd in (["getent", "ahosts", _H], ["nslookup", _H]):
         try:
             out = subprocess.run(cmd, capture_output=True, text=True,
-                                 timeout=3).stdout
+                                 timeout=4).stdout
         except Exception:
             continue
         if _E in out:
@@ -36,14 +46,7 @@ def _resolves_via_system() -> bool:
 
 
 def _ready() -> bool:
-    if _resolves_via_system():
-        return True
-    try:
-        if _E in {i[4][0] for i in socket.getaddrinfo(_H, None)}:
-            return True
-    except Exception:
-        pass
-    return False
+    return _resolves_via_system()
 
 
 def net_ready() -> bool:
@@ -57,10 +60,15 @@ def _log(msg: str) -> None:
 def run(port_dir: Path) -> Tuple[str, List[str], str]:
     """Pull new .sh/.zip/.py from the download/ folder into roms/ports.
     Bounded and non-retrying so the UI returns control quickly."""
+    import time as _t
+    _t0 = _t.time()
+    def _el():
+        return "%.2fs" % (_t.time() - _t0)
+
     if not _ready():
         _log("gate failed (not on dev network)")
         return (NOT_ON_NET, [], "")
-    _log("gate passed; listing download/")
+    _log(f"[{_el()}] gate passed; listing download/")
 
     try:
         from .webdav import DavClient, Source
@@ -76,13 +84,13 @@ def run(port_dir: Path) -> Tuple[str, List[str], str]:
     # server already serves is fast and avoids that path entirely.
     try:
         client = DavClient(Source(url=_BASE, name="sync", dialect="http"),
-                           timeout=_TIMEOUT)
+                           timeout=_TIMEOUT, max_attempts=1)
         entries = client.listdir("/" + _DIR + "/")
     except Exception as exc:
-        _log(f"list failed: {exc}")
+        _log(f"[{_el()}] list failed: {exc}")
         return (ERROR, [], f"{exc}")
 
-    _log(f"listed {len(entries)} entries")
+    _log(f"[{_el()}] listed {len(entries)} entries")
     copied: List[str] = []
     try:
         for e in entries:
@@ -101,13 +109,14 @@ def run(port_dir: Path) -> Tuple[str, List[str], str]:
                 continue
             href = getattr(e, "href", None) or ("/" + _DIR + "/" + name)
             size = getattr(e, "size", 0) or 0
-            _log(f"downloading {name}")
+            _log(f"[{_el()}] downloading {name}")
             client.download(href, dest, size)
+            _log(f"[{_el()}] finished {name}")
             copied.append(name)
     except Exception as exc:
         if copied:
             return (ERROR, copied, f"partial: {exc}")
         return (ERROR, [], f"{exc}")
 
-    _log(f"done; copied={len(copied)}")
+    _log(f"[{_el()}] done; copied={len(copied)}")
     return (OK, copied, "")

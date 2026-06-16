@@ -80,9 +80,11 @@ class Source:
 
 
 class DavClient:
-    def __init__(self, source: Source, timeout: float = 15.0):
+    def __init__(self, source: Source, timeout: float = 15.0,
+                 max_attempts: int = 2):
         self.source = source
         self.timeout = timeout
+        self.max_attempts = max(1, int(max_attempts))
         u = urllib.parse.urlsplit(source.url if "://" in source.url
                                   else "http://" + source.url)
         self._https = u.scheme == "https"
@@ -141,7 +143,8 @@ class DavClient:
         # was plainly up. A fresh connection on the second try clears
         # both stale-socket and momentary-blip cases.
         last_exc = None
-        for attempt in (1, 2):
+        attempts = tuple(range(1, self.max_attempts + 1))
+        for attempt in attempts:
             conn = self._conn()
             try:
                 conn.request(method, self._url_path(path), body=body,
@@ -150,7 +153,7 @@ class DavClient:
             except (OSError, http.client.HTTPException) as exc:
                 conn.close()
                 last_exc = exc
-                if attempt == 1:
+                if attempt < attempts[-1]:
                     import time as _t
                     _t.sleep(0.4)
                     continue
