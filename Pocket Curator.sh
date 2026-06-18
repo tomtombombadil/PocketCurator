@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.22
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.23
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -158,17 +158,38 @@ CONFDIR="$GAMEDIR/conf"
 mkdir -p "$CONFDIR"
 cd "$GAMEDIR" || exit 1
 
-# Fresh log every launch. Pipe everything through a timestamping filter
-# so every line - launcher echoes AND the Python app's stdout - is
+# Per-launch log, timestamped and retained. We used to overwrite a
+# single pocketcurator.log every launch, which destroyed the evidence
+# from the run BEFORE the one being debugged - useless when a problem
+# only shows up on the prior session. Now each launch writes its own
+# PC_<YYYY-MM-DD_HHMMSS>.log and we keep the 10 most recent, deleting
+# older ones. The timestamped name sorts chronologically and is trivial
+# to identify and hand off. Everything - launcher echoes AND the Python
+# app's stdout - is piped through a timestamping filter so every line is
 # prefixed with the wall-clock time. Prefer awk strftime (fast, no
 # per-line subprocess); fall back to a read loop if this awk lacks it.
-> "$GAMEDIR/pocketcurator.log"
+PC_LOG="$GAMEDIR/PC_$(date '+%Y-%m-%d_%H%M%S').log"
+: > "$PC_LOG"
+# Rotate: keep the 10 newest PC_*.log, delete the rest. Timestamped
+# names sort chronologically, so sort+head yields the oldest to drop.
+_pc_rotate_logs() {
+  local keep=10 all count remove
+  all=$(ls -1 "$GAMEDIR"/PC_*.log 2>/dev/null | sort)
+  count=$(printf '%s\n' "$all" | grep -c .)
+  if [ "$count" -gt "$keep" ]; then
+    remove=$((count - keep))
+    printf '%s\n' "$all" | head -n "$remove" | while IFS= read -r _f; do
+      [ -n "$_f" ] && rm -f "$_f"
+    done
+  fi
+}
+_pc_rotate_logs
 if echo test | awk '{ print strftime("%H:%M:%S") }' >/dev/null 2>&1; then
   _pc_ts() { awk '{ print strftime("%H:%M:%S")" "$0; fflush() }'; }
 else
   _pc_ts() { while IFS= read -r _l; do printf '%s %s\n' "$(date +%H:%M:%S)" "$_l"; done; }
 fi
-exec > >(_pc_ts | tee "$GAMEDIR/pocketcurator.log") 2>&1
+exec > >(_pc_ts | tee "$PC_LOG") 2>&1
 
 # Launcher-phase timing. $SECONDS counts from shell start, so these
 # lines bracket everything the in-app [timing] marks can't see: the
@@ -359,7 +380,7 @@ elif true; then
 echo "[Pocket Curator] testing pygame import..."
 pc_stage "python boot + pygame import test starting (first run after an update recompiles bytecode here)"
 if ! "$PYTHON_BIN" -c "import pygame; print('[Pocket Curator] pygame', pygame.version.ver, 'loaded OK')"; then
-  pm_message "Pocket Curator: pygame failed to import. Check pocketcurator.log."
+  pm_message "Pocket Curator: pygame failed to import. Check the newest PC_*.log in the pocketcurator folder."
   sleep 10
   if [ "$USE_SYSTEM_PYTHON" != "1" ] && [[ "$PM_CAN_MOUNT" != "N" ]]; then
     $ESUDO umount "$py_dir" 2>/dev/null || true
@@ -548,7 +569,7 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
     if [[ "$PM_CAN_MOUNT" != "N" ]]; then
       $ESUDO umount "$py_dir" 2>/dev/null || true
     fi
-    pm_message "Pocket Curator: no working display driver on this firmware. Returning to EmulationStation. (Details in pocketcurator.log)"
+    pm_message "Pocket Curator: no working display driver on this firmware. Returning to EmulationStation. (Details in the newest PC_*.log in the pocketcurator folder)"
     sleep 3
     pm_finish
     exit 1

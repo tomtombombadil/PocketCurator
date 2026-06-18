@@ -2,6 +2,24 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.23] - 2026-06-18
+
+- Fix: a system's game count now reflects the ROMs actually present on
+  disk, matching what you see when you enter it (and what
+  EmulationStation reports). Previously the count included stale
+  gamelist entries left behind after deletions, so a system could read
+  far higher than the games really there.
+- Fix: deleting a large batch now shows live progress instead of a
+  frozen dialog, and any game that fails to delete stays listed and is
+  reported - it's no longer quietly dropped from the view only to
+  reappear next launch.
+- Change: Pocket Curator now waits for an in-progress WebDAV copy to
+  finish before it exits, so a ROM can't be left half-written if you
+  back out mid-copy.
+- Change: session logs are now timestamped and the 10 most recent are
+  kept, instead of overwriting a single log each launch - so a problem
+  from an earlier run can still be inspected.
+
 ## [1.0.22] - 2026-06-17
 
 - Fix: on a device with no systems containing ROMs yet, the system

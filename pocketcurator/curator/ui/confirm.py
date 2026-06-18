@@ -101,35 +101,109 @@ class ConfirmDeleteScreen:
 
     def _commit(self) -> None:
         self._busy = True
-        all_files: List[Path] = [p for _, files in self._plan for p in files]
-        all_files.extend(self._extra_files)
-        dry = bool(self.app.config.get("behavior", {}).get("deletion_dry_run", False))
-        result = delete_paths(all_files, dry_run=dry)
+        dry = bool(self.app.config.get("behavior", {})
+                   .get("deletion_dry_run", False))
+
+        total_games = len(self._plan)
+        file_deleted = file_failed = file_skipped = 0
+        deleted_games: List[Game] = []
+        failed_games: List[Game] = []
+
+        print(f"[delete] start system={self.system.get('shortname')} "
+              f"games={total_games} dry_run={dry}")
+
+        # Delete per-game (synchronously - so this can never be interrupted
+        # by a normal exit, which is blocked while we're in here), drawing
+        # progress as we go. A frozen dialog during an 800-game batch is
+        # exactly what gets force-quit mid-delete, stranding ROMs; showing
+        # live progress stops that.
+        for idx, (game, files) in enumerate(self._plan, start=1):
+            result = delete_paths(list(files), dry_run=dry)
+            file_deleted += len(result.deleted)
+            file_failed += len(result.failed)
+            file_skipped += len(result.skipped)
+            # A game is "removed" when its ROM is actually gone afterwards
+            # (or, in a dry run, would have been). Checking the ROM itself
+            # - not merely "no failures" - means a media-only hiccup never
+            # keeps a successfully-removed ROM in the list, and a genuine
+            # ROM-unlink failure is never reported as success.
+            rom_gone = dry or not (game.rom_path and game.rom_path.exists())
+            if rom_gone:
+                deleted_games.append(game)
+            else:
+                failed_games.append(game)
+                print(f"[delete] ROM NOT removed: {game.rom_path}")
+            if idx == 1 or idx % 8 == 0 or idx == total_games:
+                self._draw_deleting(idx, total_games)
+
+        print(f"[delete] done system={self.system.get('shortname')} "
+              f"games_marked={total_games} games_removed={len(deleted_games)} "
+              f"games_failed={len(failed_games)} files_deleted={file_deleted} "
+              f"files_skipped={file_skipped} files_failed={file_failed}")
 
         # Flag for the launcher's exit-time ES refresh: only when this was
-        # a real run that actually removed something. Dry runs and no-op
-        # deletes leave ES's gamelist unchanged, so no restart is needed.
-        if not dry and result.deleted:
+        # a real run that actually removed something.
+        if not dry and file_deleted:
             self.app.deletions_occurred = True
 
-        # Notify owner with the games that were (at least partially) deleted
+        # Prune ONLY the games actually removed. Anything that failed stays
+        # visible instead of silently vanishing from the view and then
+        # reappearing next session (the old code removed every marked game
+        # regardless of whether its file was really deleted).
         if self.on_committed:
-            self.on_committed(self.games)
+            self.on_committed(deleted_games)
 
-        # Build a result string for the user
         if dry:
             summary = (f"Dry run complete.\n"
-                       f"Would have removed {len(result.deleted)} files "
+                       f"Would have removed {len(deleted_games)} game"
+                       f"{'s' if len(deleted_games) != 1 else ''} "
                        f"({humanize_bytes(self._total_bytes)}).")
-        elif result.failed:
-            summary = (f"Removed {len(result.deleted)} files.\n"
-                       f"{len(result.failed)} failed - see log.txt for details.")
+        elif failed_games:
+            summary = (f"Removed {len(deleted_games)} of {total_games} "
+                       f"game{'s' if total_games != 1 else ''} "
+                       f"({file_deleted} files).\n"
+                       f"{len(failed_games)} could NOT be removed - see the "
+                       f"newest PC_*.log.")
         else:
-            summary = (f"Removed {len(result.deleted)} files.\n"
+            extra = f" ({file_skipped} already gone)" if file_skipped else ""
+            summary = (f"Removed {len(deleted_games)} game"
+                       f"{'s' if len(deleted_games) != 1 else ''} "
+                       f"({file_deleted} files){extra}.\n"
                        f"Freed approximately {humanize_bytes(self._total_bytes)}.")
 
         self._result_summary = summary
         self._busy = False
+
+    def _draw_deleting(self, done: int, total: int) -> None:
+        """Live progress while a delete batch runs. Called from _commit on
+        the main thread; flips the display directly so the user sees the
+        batch advancing instead of a frozen confirm dialog."""
+        surface = self.app.surface
+        theme = self.app.config["theme"]
+        base = self.app.config["ui"]["font_size_base"]
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 210))
+        surface.blit(overlay, (0, 0))
+        title_font = self.app.fonts.get(int(base * 1.2))
+        body_font = self.app.fonts.get(base)
+        small_font = self.app.fonts.get(max(11, int(base * 0.75)))
+        cx = surface.get_width() // 2
+        cy = surface.get_height() // 2
+        t = title_font.render("Deleting...", True, tuple(theme["text_color"]))
+        surface.blit(t, (cx - t.get_width() // 2, cy - t.get_height() - 24))
+        c = body_font.render(f"{done} / {total}", True,
+                             tuple(theme["text_color"]))
+        surface.blit(c, (cx - c.get_width() // 2, cy - c.get_height() // 2))
+        bar_w = min(surface.get_width() - 120, 600)
+        bar = pygame.Rect(cx - bar_w // 2, cy + 24, bar_w, 10)
+        pygame.draw.rect(surface, tuple(theme["muted_color"]), bar, 1)
+        if total:
+            fill = pygame.Rect(bar.x, bar.y, int(bar_w * done / total), 10)
+            pygame.draw.rect(surface, tuple(theme["highlight_color"]), fill)
+        w = small_font.render("Do not power off until this finishes.", True,
+                              tuple(theme["accent_color"]))
+        surface.blit(w, (cx - w.get_width() // 2, bar.bottom + 16))
+        self.app._present()
 
     def draw(self, surface: pygame.Surface) -> None:
         # Render whatever is below us, then a darkened overlay.

@@ -797,8 +797,59 @@ class App:
             self._present()
             self.clock.tick(fps_cap)
 
+        self._drain_pending_writes()
         pygame.quit()
         return 0
+
+    def _drain_pending_writes(self) -> None:
+        """Before teardown, wait for any in-flight copy to finish writing.
+
+        The fetch worker is a daemon thread: if we let run() return while
+        a copy is mid-file, the interpreter exits and the OS kills that
+        thread between write() calls, leaving a truncated ROM on the card.
+        So we hold the process open until the queue is idle, keeping a
+        simple progress screen up so the wait is explained. Input is
+        ignored here - exit is already committed and we must not start
+        anything new during teardown. Per-request timeouts in the WebDAV
+        client bound this; a dead connection ends the job rather than
+        hanging forever. Deletes don't need draining: they run
+        synchronously on this thread and have already completed before we
+        reach here.
+        """
+        q = getattr(self, "fetch_queue", None)
+        if q is None or not q.busy():
+            return
+        print("[exit] copy still writing - holding exit until it finishes")
+        theme = self.config["theme"]
+        font = self.fonts.get(self.config["ui"]["font_size_base"])
+        small = self.fonts.get(max(11, int(self.config["ui"]["font_size_base"]
+                                            * 0.75)))
+        while q.busy():
+            for _ in pygame.event.get():
+                pass  # drain & ignore; do not act on input mid-teardown
+            self.surface.fill(tuple(theme["bg_color"]))
+            msg = font.render("Finishing copy - please wait...", True,
+                              tuple(theme["text_color"]))
+            self.surface.blit(
+                msg, ((self.screen_w - msg.get_width()) // 2,
+                      self.screen_h // 2 - msg.get_height()))
+            try:
+                label = q.snapshot().legend_text()
+            except Exception:  # noqa: BLE001
+                label = ""
+            if label:
+                sub = small.render(label, True, tuple(theme["muted_color"]))
+                self.surface.blit(
+                    sub, ((self.screen_w - sub.get_width()) // 2,
+                          self.screen_h // 2 + 8))
+            warn = small.render("Do not power off.", True,
+                                tuple(theme["accent_color"]))
+            self.surface.blit(
+                warn, ((self.screen_w - warn.get_width()) // 2,
+                       self.screen_h // 2 + 8 + small.get_linesize()))
+            self._present()
+            self.clock.tick(20)
+        print("[exit] copy finished; exiting")
 
     def is_repeat(self, key=None) -> bool:
         """True if the current event being handled is an auto-repeat of a
