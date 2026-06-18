@@ -115,21 +115,6 @@ class Updater:
     def busy(self) -> bool:
         return self.state in (CHECKING, DOWNLOADING, VERIFYING, STAGING)
 
-    def start_check(self) -> None:
-        if self.busy() or self.state == STAGED:
-            return
-        self.state = CHECKING
-        self.error = ""
-        self._spawn(self._check_worker)
-
-    def start_download(self) -> None:
-        if self.state != AVAILABLE:
-            return
-        self.state = DOWNLOADING
-        self.progress = 0.0
-        self.error = ""
-        self._spawn(self._download_worker)
-
     def start_full(self, prerelease: bool = False) -> None:
         """Check, and if an update exists, download + verify + stage it in
         one motion. The ONLY thing the pre-release flag changes is which

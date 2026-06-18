@@ -26,7 +26,6 @@ from __future__ import annotations
 import html.parser
 import http.client
 import posixpath
-import time
 import urllib.parse
 
 # ssl is intentionally NOT imported at module level: the bundled Pyxel
@@ -287,8 +286,7 @@ class DavClient:
             is_dir = absolute.endswith("/")
             name = urllib.parse.unquote(rel.rstrip("/"))
             out.append(RemoteEntry(name=name,
-                                   href=urllib.parse.unquote(absolute).rstrip("/")
-                                   if False else absolute.rstrip("/"),
+                                   href=absolute.rstrip("/"),
                                    is_dir=is_dir))
         out.sort(key=lambda e: (not e.is_dir, e.name.lower()))
         return out

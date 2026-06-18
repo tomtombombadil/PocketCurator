@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.21
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.22
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -250,7 +250,6 @@ fi
 export PC_PAD_INPUT=0
 
 if [ "$USE_SYSTEM_PYTHON" = "0" ]; then
-  pc_stage "runtime ready"
   echo "[Pocket Curator] using bundled Pyxel runtime"
   runtime="pyxel_2.2.8_python_3.11"
   runtime_file="$controlfolder/libs/${runtime}.squashfs"
@@ -295,6 +294,7 @@ if [ "$USE_SYSTEM_PYTHON" = "0" ]; then
   export PYTHONHOME="$py_dir"
   export PYTHONPYCACHEPREFIX="/tmp/pocketcurator_pycache"
   PYTHON_BIN="$py_dir/bin/python3"
+  pc_stage "runtime ready"
 fi
 
 if [ "$USE_SYSTEM_PYTHON" = "1" ]; then
@@ -459,9 +459,7 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
     darkos|arkos)
       preferred="kmsdrm+sysSDL|kmsdrm|LD_PRELOAD=$SYS_SDL2" ;;
     amberelec)
-      if [ -f "$GAMEDIR/pocketcurator/libs.aarch64/pcsdl/libSDL2-2.0.so.0" ]; then
-        preferred="kmsdrm+pcSDL|kmsdrm|LD_PRELOAD=$GAMEDIR/pocketcurator/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
-      elif [ -f "$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0" ]; then
+      if [ -f "$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0" ]; then
         preferred="kmsdrm+pcSDL|kmsdrm|LD_PRELOAD=$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
       else
         preferred="kmsdrm|kmsdrm|"
@@ -495,8 +493,7 @@ if [ "$USE_SYSTEM_PYTHON" != "1" ]; then
   # Our own SDL build (libs.aarch64/pcsdl): 2.28.4 with KMSDRM in
   # dlopen mode - the answer for firmwares whose system SDL is too old
   # to preload (AmberELEC) while the pygame wheel's SDL has no kmsdrm.
-  PC_SDL="$GAMEDIR/pocketcurator/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
-  [ -f "$PC_SDL" ] || PC_SDL="$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
+  PC_SDL="$GAMEDIR/libs.aarch64/pcsdl/libSDL2-2.0.so.0"
   if [ -f "$PC_SDL" ]; then
     probe_attempts+=("kmsdrm+pcSDL|kmsdrm|LD_PRELOAD=$PC_SDL")
   fi

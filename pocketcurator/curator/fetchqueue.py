@@ -17,6 +17,7 @@ Safety properties:
 
 from __future__ import annotations
 
+import os
 import shutil
 import threading
 import time
@@ -120,13 +121,36 @@ class FetchQueue:
             if ((self._thread is None or not self._thread.is_alive())
                     and not self._jobs):
                 self._snap = QueueSnapshot()
-            need = sum(j.total_bytes() for j in self._jobs)
-            need += sum(j.total_bytes() for j in jobs)
-            free = shutil.disk_usage(self.dest_dir).free
-            if free < need + 32 * 1024 * 1024:
-                return (f"Not enough free space: need "
-                        f"{need // (1024*1024)} MB, have "
-                        f"{free // (1024*1024)} MB.")
+            # Free-space check, grouped by the filesystem each destination
+            # lives on. Jobs can carry their own dest_dir (a different
+            # system, and on multi-card devices a different mount, e.g.
+            # /roms vs /roms2), so summing everything against one folder
+            # could pass a check the target card can't actually satisfy.
+            # Group required bytes by st_dev and verify each card has room.
+            need_by_dev: dict = {}
+            sample_by_dev: dict = {}
+            for j in (self._jobs + list(jobs)):
+                d = Path(j.dest_dir) if j.dest_dir else self.dest_dir
+                try:
+                    dev = os.stat(d).st_dev
+                except OSError:
+                    d = self.dest_dir
+                    try:
+                        dev = os.stat(d).st_dev
+                    except OSError:
+                        dev = ("?", str(d))
+                need_by_dev[dev] = need_by_dev.get(dev, 0) + j.total_bytes()
+                sample_by_dev.setdefault(dev, d)
+            for dev, need in need_by_dev.items():
+                try:
+                    free = shutil.disk_usage(sample_by_dev[dev]).free
+                except OSError:
+                    continue   # can't measure it; don't block the copy
+                if free < need + 32 * 1024 * 1024:
+                    return (f"Not enough free space on "
+                            f"{sample_by_dev[dev]}: need "
+                            f"{need // (1024*1024)} MB, have "
+                            f"{free // (1024*1024)} MB.")
             self._jobs.extend(jobs)
             self._snap.job_count += len(jobs)
             self._snap.queue_bytes_total += sum(j.total_bytes()

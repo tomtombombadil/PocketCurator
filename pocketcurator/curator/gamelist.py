@@ -7,8 +7,13 @@ We accept the format variations that show up in the wild:
     - <region> tag, OR region embedded in the filename "(USA)", "(Europe)"
     - relative media paths starting with "./", or with absolute "/roms/..."
 
-We never mutate gamelist.xml ourselves - per project policy the user is
-expected to regenerate it from EmulationStation after deletion.
+This module is the READ path: it only parses gamelist.xml and never
+writes it. The two places allowed to write a gamelist are
+ports_gamelist.py (Pocket Curator's own Ports entry) and
+gamelist_merge.py (carrying a fetched game's scraped metadata into its
+destination system); neither is reached from here. Deletions performed
+in the app are surfaced to ES by triggering a reload/refresh on exit,
+not by rewriting other systems' gamelists in place.
 """
 
 from __future__ import annotations

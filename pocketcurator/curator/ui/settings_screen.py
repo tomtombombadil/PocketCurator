@@ -338,8 +338,7 @@ class SettingsScreen:
 
             # Value / swatch on the right.
             if opt["kind"] == "color_choice":
-                from ..colors import (swatch_rgb_font, swatch_rgb_highlight,
-                                      font_color_names, highlight_color_names)
+                from ..colors import (swatch_rgb_font, swatch_rgb_highlight)
                 cur = opt["get"](cfg)
                 rgb = (swatch_rgb_font(cur, theme) if opt["palette"] == "font"
                        else swatch_rgb_highlight(cur, theme))
@@ -348,8 +347,6 @@ class SettingsScreen:
                 box = pygame.Rect(W - right_pad - swatch_w,
                                   y + (row_h - swatch_w) // 2,
                                   swatch_w, swatch_w)
-                # arrows hint the left/right scroll
-                arrow_c = hi_text if is_sel else muted
                 lx = box.x - 10
                 surface.blit(name_surf,
                              (lx - name_surf.get_width(),

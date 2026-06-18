@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import pygame
 
@@ -345,6 +345,11 @@ class App:
         # reads this after run() to decide whether to ask the launcher
         # to refresh EmulationStation so its in-RAM gamelist refreshes.
         self.deletions_occurred = False
+        # Set True once any game is copied from a WebDAV source this
+        # session. main.py reads it (alongside deletions_occurred) to
+        # decide whether the launcher should refresh EmulationStation so
+        # freshly-copied games appear in the menu.
+        self.fetches_occurred = False
 
         # ---- input tracking --------------------------------------------
         # Set of currently-held pygame key codes. Populated by run() as
@@ -404,9 +409,7 @@ class App:
 
     def start(self) -> None:
         if self.roms_dir is None:
-            from .ui.exit_prompt import ExitPromptScreen
             print("[app] No ROM directory found. Exiting after a confirmation.")
-            # Use the exit screen but adjust message - or build a simple one inline
             self._screens.append(_NoRomsScreen(self))
             return
 

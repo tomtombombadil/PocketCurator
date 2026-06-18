@@ -58,20 +58,33 @@ class SystemBrowserScreen:
         elif event.key == pygame.K_x:
             self._begin_delete_system()
         elif event.key == pygame.K_y:
-            # Fetch from WebDAV into the highlighted system - the
-            # destination is decided by what's under the cursor, so the
-            # flow never has to ask where files are going. Guarded so a
-            # missing runtime piece degrades to a log line, never a
-            # crash (v0.63.0's ssl ImportError took down the whole app).
-            if self.systems:
-                try:
-                    from .remote_flow import start_fetch
-                    targets = getattr(self.app, "fetch_targets",
-                                      None) or self.systems
-                    start_fetch(self.app, self.systems[self.selected],
-                                targets)
-                except Exception as exc:  # noqa: BLE001
-                    print(f"[fetch] feature unavailable: {exc}")
+            # Fetch from WebDAV. Normally the highlighted system is both
+            # the smart-jump target and the title context, but the actual
+            # per-game destination is decided by the REMOTE folder name
+            # (see RemoteBrowserScreen._context_for), never by what's
+            # highlighted here. So when the device has no populated
+            # systems yet - a fresh handheld whose ROM folders are still
+            # empty - there's nothing to highlight, but the user still
+            # needs to reach their server to copy ROMs ON in the first
+            # place. Open the flow anyway with a neutral placeholder:
+            # smart-jump simply won't jump, the user lands at the server
+            # root, and copying routes into the matching (empty) ROM
+            # folder via the fetch-target list. Guarded so a missing
+            # runtime piece degrades to a log line, never a crash
+            # (v0.63.0's ssl ImportError took down the whole app).
+            try:
+                from .remote_flow import start_fetch
+                targets = getattr(self.app, "fetch_targets",
+                                  None) or self.systems
+                if self.systems:
+                    launch = self.systems[self.selected]
+                else:
+                    launch = {"shortname": "", "display": "your device",
+                              "path": "", "extensions": [], "theme": "",
+                              "rom_count": 0}
+                start_fetch(self.app, launch, targets)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[fetch] feature unavailable: {exc}")
         elif event.key == pygame.K_ESCAPE:
             from .exit_prompt import ExitPromptScreen
             self.app.push_screen(ExitPromptScreen(self.app))
@@ -209,7 +222,14 @@ class SystemBrowserScreen:
             msg = list_font.render("No systems with ROMs were found.",
                                    True, tuple(theme["muted_color"]))
             surface.blit(msg,
-                         ((screen_w - msg.get_width()) // 2, screen_h // 2))
+                         ((screen_w - msg.get_width()) // 2,
+                          screen_h // 2 - msg.get_height()))
+            hint = small_font.render(
+                "Press Y to connect to a WebDAV server and copy ROMs onto "
+                "your device.", True, tuple(theme["accent_color"]))
+            surface.blit(hint,
+                         ((screen_w - hint.get_width()) // 2,
+                          screen_h // 2 + 6))
             self._draw_legend(surface, theme, ui)
             return
 

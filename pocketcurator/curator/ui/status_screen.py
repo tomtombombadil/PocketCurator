@@ -18,7 +18,7 @@ import pygame
 import threading
 
 from .. import __version__
-from ..updater import Updater, check_internet, clock_is_sane
+from ..updater import check_internet, clock_is_sane
 
 
 class StatusScreen:

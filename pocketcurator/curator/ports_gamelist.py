@@ -76,9 +76,12 @@ def entry_needs_metadata(ports_dir: Path) -> bool:
     Read-only check: does our Pocket Curator entry need enrichment in any
     gamelist EmulationStation might read?
 
-    Returns True if, in the primary gamelist that exists, our entry is
-    missing entirely or is missing/empty for any field in OUR_FIELDS.
-    Does NOT write anything - writing while ES is running is futile
+    Returns True if, in the first gamelist that exists, our entry is
+    missing entirely or is missing/empty/stale for any field in
+    OUR_FIELDS. If NO gamelist exists yet (a brand-new install before ES
+    has scanned Ports), returns False: there is no bare entry to enrich,
+    and the launcher's "register" path + tools/install_metadata.sh own
+    fresh-install registration. Does NOT write anything - writing while ES is running is futile
     because ES rewrites our node from its in-RAM FileData on its next
     flush (see ES's Gamelist.cpp updateGamelist). The launcher performs
     the actual write during the window when ES is stopped.

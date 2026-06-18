@@ -2,6 +2,19 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.22] - 2026-06-17
+
+- Fix: on a device with no systems containing ROMs yet, the system
+  screen was empty and pressing Y did nothing - leaving no way to reach
+  a WebDAV server to copy ROMs onto the device in the first place. Y now
+  opens the WebDAV connection flow even when nothing is installed, so a
+  fresh handheld can pull its first games over the network. The empty
+  screen now says so.
+- Internal: removed dead code, tidied the launcher's AmberELEC SDL
+  preload path, and made the fetch free-space check account for
+  per-card destinations on multi-SD setups. No behavioral change on
+  devices that already had ROMs.
+
 ## [1.0.21] - 2026-06-15
 
 - Internal tooling. No user-facing changes.
