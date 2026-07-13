@@ -2,6 +2,15 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.32] - 2026-07-13
+
+- Change: the on-screen keyboard now wraps around. Moving left from the
+  leftmost key jumps to the rightmost, up from the top row to the bottom,
+  and so on.
+- Internal: network lookups now resolve IPv4 only. Requesting both
+  address families made some firmwares stall for around 15 seconds on an
+  IPv6 lookup that could never have been useful.
+
 ## [1.0.31] - 2026-07-13
 
 - Fix: the update dialog claimed you were running the latest version

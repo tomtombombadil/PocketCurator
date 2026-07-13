@@ -24,17 +24,23 @@ ERROR = "error"
 
 
 def _resolves_via_system() -> bool:
-    # Try Python's own resolver first: it's in-process (no subprocess
-    # spawn) and on most firmwares it sees the system resolver fine. Only
-    # if that comes back without our IP do we shell out - and those calls
-    # are tightly timed because getent ahosts can hang ~15s on some
-    # firmwares doing an AAAA lookup.
+    # IPv4 ONLY, deliberately. Asking for both families (the default)
+    # makes the resolver issue an AAAA query alongside the A query, and
+    # on some firmwares - Knulli measurably - that AAAA lookup hangs for
+    # ~15 seconds before the A answer is returned. The gate then "worked"
+    # but took 15s, which was the whole of the perceived slowness: the
+    # actual listing and download after it take about 0.2s. Our gate
+    # address is IPv4, so an AAAA answer could never help us anyway.
     try:
-        if _E in {i[4][0] for i in socket.getaddrinfo(_H, None)}:
+        if _E in {i[4][0]
+                  for i in socket.getaddrinfo(_H, None, socket.AF_INET)}:
             return True
     except Exception:
         pass
-    for cmd in (["getent", "ahosts", _H], ["nslookup", _H]):
+    # Fallbacks, still tightly timed. `getent ahosts` has the same AAAA
+    # problem, so ask for the IPv4 database explicitly.
+    for cmd in (["getent", "ahostsv4", _H], ["getent", "ahosts", _H],
+                ["nslookup", _H]):
         try:
             out = subprocess.run(cmd, capture_output=True, text=True,
                                  timeout=4).stdout

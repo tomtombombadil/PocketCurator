@@ -86,9 +86,33 @@ class OSKScreen:
         return (FULL_LOWER, FULL_UPPER, FULL_SYMBOL)[self.full_page]
 
     def _clamp(self) -> None:
+        """Wrap the cursor around the edges rather than stopping dead.
+
+        Rows wrap top<->bottom, columns wrap left<->right. Rows can be
+        different lengths, so after a vertical move the column is
+        clamped into the new row rather than wrapped - moving up/down
+        shouldn't teleport you across the keyboard, it should keep you
+        roughly under your finger.
+        """
         grid = self._grid()
-        self.row = max(0, min(self.row, len(grid) - 1))
-        self.col = max(0, min(self.col, len(grid[self.row]) - 1))
+        if not grid:
+            return
+        self.row %= len(grid)                      # wrap up/down
+        row_len = len(grid[self.row])
+        if row_len:
+            self.col %= row_len                    # wrap left/right
+        else:
+            self.col = 0
+
+    def _clamp_col(self) -> None:
+        """Keep the column inside the current row without wrapping - used
+        after a vertical move onto a shorter row."""
+        grid = self._grid()
+        if not grid:
+            return
+        self.row %= len(grid)
+        row_len = len(grid[self.row])
+        self.col = max(0, min(self.col, max(0, row_len - 1)))
 
     def _press(self) -> None:
         key = self._grid()[self.row][self.col]
@@ -119,9 +143,9 @@ class OSKScreen:
             return
         k = event.key
         if k == pygame.K_UP:
-            self.row -= 1; self._clamp()
+            self.row -= 1; self._clamp_col()
         elif k == pygame.K_DOWN:
-            self.row += 1; self._clamp()
+            self.row += 1; self._clamp_col()
         elif k == pygame.K_LEFT:
             self.col -= 1; self._clamp()
         elif k == pygame.K_RIGHT:

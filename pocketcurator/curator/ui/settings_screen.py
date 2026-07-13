@@ -191,33 +191,33 @@ class SettingsScreen:
         self._sync_busy = True
         try:
             print("[netsync] X pressed on Check For Updates; starting", flush=True)
-            self.app._show_status("Sync: checking network...")
             try:
                 from .. import netsync
             except Exception as exc:
                 print("[netsync] import failed: %r" % exc, flush=True)
-                self.app._show_status("Sync: import error")
                 return
             status, copied, message = netsync.run(self.app.port_dir)
             print("[netsync] result status=%s copied=%s msg=%s"
                   % (status, copied, message), flush=True)
+            # One toast, at the end, reporting the outcome. The running
+            # commentary ("checking network...", "not on dev network")
+            # is gone - it belongs in the log, not on screen.
             if status == netsync.NOT_ON_NET:
-                self.app._show_status("Sync: not on dev network")
                 return
             if status == netsync.OK:
                 if copied:
                     n = len(copied)
                     names = ", ".join(copied[:4]) + ("..." if n > 4 else "")
                     self.app._show_status(
-                        f"Sync: downloaded {n} file{'s' if n != 1 else ''}: {names}")
+                        f"Downloaded {n} file{'s' if n != 1 else ''}: {names}")
                 else:
-                    self.app._show_status("Sync: connected, nothing new")
+                    self.app._show_status("Connected - nothing new")
                 return
             if copied:
                 self.app._show_status(
-                    f"Sync: got {len(copied)}, then error: {message}")
+                    f"Got {len(copied)}, then failed: {message}")
             else:
-                self.app._show_status(f"Sync failed: {message}")
+                self.app._show_status(f"Failed: {message}")
         finally:
             self._sync_busy = False
             # The sync blocked the event loop, so pygame's auto-repeat has
