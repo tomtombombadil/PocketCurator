@@ -664,10 +664,10 @@ class RemoteBrowserScreen:
     def _page(self, direction: int) -> None:
         """Turn one page of the remote listing.
 
-        Same rule as the deletion list: show the NEXT screenful, skip
-        nothing, and leave the highlight where it sits on the page. Was
-        a hardcoded 12-row jump, which matched no actual screen and
-        either skipped rows or under-shot depending on the device.
+        Same rule as the deletion list: the window moves by exactly one
+        screenful (nothing skipped), and the selection lands at the
+        leading edge of travel - top of the new page on PgDn, bottom on
+        PgUp. At the ends the cursor runs to the last/first entry.
         """
         if not self.entries:
             return
@@ -675,13 +675,17 @@ class RemoteBrowserScreen:
         last = len(self.entries) - 1
         max_scroll = max(0, len(self.entries) - visible)
 
-        offset = min(max(self.selected - self.scroll, 0), visible - 1)
         new_scroll = max(0, min(self.scroll + direction * visible, max_scroll))
-        new_sel = new_scroll + offset
-        new_sel = max(new_scroll, min(new_sel, min(last, new_scroll + visible - 1)))
 
-        self.scroll = new_scroll
-        self.selected = new_sel
+        if new_scroll == self.scroll:
+            self.selected = last if direction > 0 else 0
+        else:
+            self.scroll = new_scroll
+            if direction > 0:
+                self.selected = min(new_scroll, last)
+            else:
+                self.selected = min(new_scroll + visible - 1, last)
+
         self._preview_due_ms = pygame.time.get_ticks() + PREVIEW_DEBOUNCE_MS
         self._desc_offset_px = 0.0
         self._desc_manual = False

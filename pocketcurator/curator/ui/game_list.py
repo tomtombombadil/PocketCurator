@@ -283,19 +283,25 @@ class GameListScreen:
     def _page(self, direction: int) -> None:
         """Page down (direction +1) or page up (direction -1).
 
-        A page turn shows the NEXT screen's worth of games - no more, no
-        less. Nothing is skipped: the row after the last one you could
-        see becomes the first one you can see.
+        A page turn shows the NEXT (or previous) screenful - the window
+        moves by exactly the number of rows on screen, so nothing is
+        skipped and nothing is shown twice.
 
-        The highlight is NOT dragged to the top (or bottom). It keeps
-        its position within the window, so paging is purely "turn the
-        page" - where the cursor sits on that page is a separate concern
-        from which games are listed. The old behaviour moved the
-        selection a full page AND then re-anchored the scroll to it,
-        which skipped roughly an entire screen of games per press.
+        The selection lands at the leading edge of travel:
+          - PgDn: highlight the TOP game of the new page. You're heading
+            down, so you land on the first of the new games and can walk
+            down through them.
+          - PgUp: highlight the BOTTOM game of the new page. Same idea in
+            reverse.
 
-        At the ends, the window clamps and the selection settles on the
-        first/last game rather than running off.
+        Example (14 rows visible, games numbered from 1): sitting on game
+        14 at the bottom of the screen, PgDn shows games 15-28 with 15
+        highlighted. From there, PgUp shows games 1-14 with 14
+        highlighted.
+
+        At the ends, when the window can't move any further, the
+        selection runs to the very last (PgDn) or very first (PgUp) game
+        rather than doing nothing.
         """
         if not self.games:
             return
@@ -303,20 +309,18 @@ class GameListScreen:
         last = len(self.games) - 1
         max_scroll = max(0, len(self.games) - visible)
 
-        # Where the cursor sits within the visible window (0 = top row).
-        offset = min(max(self.selected - self.scroll, 0), visible - 1)
+        new_scroll = max(0, min(self.scroll + direction * visible, max_scroll))
 
-        new_scroll = self.scroll + direction * visible
-        new_scroll = max(0, min(new_scroll, max_scroll))
-
-        # Same row on the new page...
-        new_sel = new_scroll + offset
-        # ...but never past the end of the list, and never outside the
-        # window we just scrolled to.
-        new_sel = max(new_scroll, min(new_sel, min(last, new_scroll + visible - 1)))
+        if new_scroll == self.scroll:
+            # Window is already against the end - take the cursor there.
+            self.selected = last if direction > 0 else 0
+            return
 
         self.scroll = new_scroll
-        self.selected = new_sel
+        if direction > 0:
+            self.selected = min(new_scroll, last)                 # top row
+        else:
+            self.selected = min(new_scroll + visible - 1, last)   # bottom row
 
     def _jump_to(self, idx: int) -> None:
         if not self.games:

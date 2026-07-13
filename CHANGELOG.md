@@ -2,6 +2,14 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.28] - 2026-07-13
+
+- Change: paging now moves the highlight to the leading edge of travel.
+  R1 (PgDn) shows the next screenful with the TOP game highlighted; L1
+  (PgUp) shows the previous screenful with the BOTTOM game highlighted.
+  At the ends, the highlight runs to the last (R1) or first (L1) game.
+  Applies to both the game list and the WebDAV fetch list.
+
 ## [1.0.27] - 2026-07-13
 
 - Fix: L1/R1 paging in the game list skipped games. The page size was
