@@ -88,6 +88,16 @@ class Updater:
         self.latest_version: str = ""
         self.progress: float = 0.0  # 0..1 while DOWNLOADING
 
+        # Filled by a check: the newest release on each channel that is
+        # NEWER than what's running (None = nothing newer there).
+        self.stable: Optional[dict] = None
+        self.prerelease: Optional[dict] = None
+        # Which channel the user chose to install from.
+        self.channel: str = ""
+        # Newest stable that exists at all - used to tell whether the
+        # running build is itself a pre-release.
+        self._newest_stable_seen: str = ""
+
         self._asset_url: str = ""
         self._asset_size: int = 0
         self._sha_url: str = ""
@@ -116,22 +126,57 @@ class Updater:
         return self.state in (CHECKING, DOWNLOADING, VERIFYING, STAGING)
 
     def start_full(self, prerelease: bool = False) -> None:
-        """Check, and if an update exists, download + verify + stage it in
-        one motion. The ONLY thing the pre-release flag changes is which
-        GitHub endpoint we read; everything after is identical."""
+        """Check BOTH channels. Nothing downloads yet - the user chooses.
+
+        The old behaviour checked one channel (chosen by a hidden key)
+        and immediately downloaded whatever it found. Now one check
+        surfaces the newest stable AND the newest pre-release, and the
+        user picks: A for stable, Y for pre-release. `prerelease` is
+        accepted and ignored, so existing call sites keep working.
+        """
         if self.busy() or self.state == STAGED:
             return
-        self._prerelease = prerelease
         self.state = CHECKING
         self.error = ""
-        self._spawn(self._full_worker)
+        self.stable = None
+        self.prerelease = None
+        self._spawn(self._check_worker)
 
-    def _full_worker(self) -> None:
-        self._check_worker()
-        if self.state == AVAILABLE:
-            self.state = DOWNLOADING
-            self.progress = 0.0
-            self._download_worker()
+    def install(self, channel: str) -> None:
+        """Download + verify + stage the release the user chose.
+
+        channel: "stable" or "prerelease". A no-op if that channel has
+        nothing newer, so a stray key press can't start a phantom
+        download.
+        """
+        if self.busy() or self.state == STAGED:
+            return
+        cand = self.stable if channel == "stable" else self.prerelease
+        if not cand:
+            return
+        self.channel = channel
+        self.latest_version = cand["version"]
+        self._asset_url = cand["url"]
+        self._asset_size = cand["size"]
+        self._sha_url = cand["sha_url"]
+        self.state = DOWNLOADING
+        self.progress = 0.0
+        self.error = ""
+        self._spawn(self._download_worker)
+
+    def channel_label(self, channel: Optional[str] = None) -> str:
+        """'Stable Release' / 'Pre-Release', for user-facing text."""
+        ch = channel or getattr(self, "channel", "")
+        return "Pre-Release" if ch == "prerelease" else "Stable Release"
+
+    def running_prerelease(self) -> bool:
+        """True when the build in use is newer than the newest stable -
+        i.e. the user is on the pre-release channel. Only meaningful
+        after a check; before that we can't know, so we say False."""
+        s = getattr(self, "_newest_stable_seen", "")
+        if not s:
+            return False
+        return _version_tuple(self.current_version) > _version_tuple(s)
 
     def _say(self, msg: str) -> None:
         print(f"[updater] {msg}")
@@ -155,17 +200,22 @@ class Updater:
         if self.state == ERROR:
             return self.error or "Update failed."
         if self.state == AVAILABLE:
-            mb = self._asset_size / (1024 * 1024) if self._asset_size else 0
-            size = f" ({mb:.1f} MB)" if mb else ""
-            return f"Press A to download v{self.latest_version}{size}."
+            bits = []
+            if self.stable:
+                bits.append(f"Stable v{self.stable['version']}")
+            if self.prerelease:
+                bits.append(f"Pre-Release v{self.prerelease['version']}")
+            return ("Available: " + ", ".join(bits)) if bits else "Up to date."
         if self.state == STAGED:
             return ("Downloaded and verified. The update installs itself "
                     "the next time you launch Pocket Curator.")
         if self.state == UP_TO_DATE:
-            return f"You are running the latest version (v{self.current_version})."
+            kind = "Pre-Release" if self.running_prerelease() else "Stable Release"
+            return (f"You are running the latest {kind} "
+                    f"(v{self.current_version}).")
         if self.busy():
             return "Working... you can keep using the app."
-        return "Checks GitHub for a new release. Needs WiFi."
+        return "Checks GitHub for a new Stable Release or Pre-Release. Needs WiFi."
 
     # ------------------------------------------------------------------
     # Workers
@@ -175,52 +225,91 @@ class Updater:
         self._thread = threading.Thread(target=target, daemon=True)
         self._thread.start()
 
+    def _release_candidate(self, rel: dict) -> Optional[dict]:
+        """Pull the bits we need out of a GitHub release, or None if it
+        carries no usable port zip."""
+        if not rel:
+            return None
+        tag = str(rel.get("tag_name", ""))
+        zip_asset = sha_asset = None
+        for a in rel.get("assets", []) or []:
+            name = str(a.get("name", ""))
+            if ASSET_RE.match(name):
+                zip_asset = a
+            elif name.endswith(".zip.sha256"):
+                sha_asset = a
+        if not tag or not zip_asset:
+            return None
+        return {
+            "version": tag.lstrip("vV"),
+            "url": zip_asset.get("browser_download_url", ""),
+            "size": int(zip_asset.get("size", 0) or 0),
+            "sha_url": (sha_asset or {}).get("browser_download_url", ""),
+        }
+
     def _check_worker(self) -> None:
+        """Survey BOTH channels in one check.
+
+        The user gets one "Check For Updates" and sees the truth about
+        both: the newest stable, and the newest pre-release. They then
+        choose - A for stable, Y for pre-release - instead of a hidden
+        key quietly changing which endpoint we read. Whichever they pick,
+        the download path afterwards is identical.
+        """
         try:
-            prerelease = getattr(self, "_prerelease", False)
-            kind = "pre-release" if prerelease else "update"
-            self._say(f"checking for {kind} "
-                      f"(current v{self.current_version})...")
+            self._say(f"checking both channels (current "
+                      f"v{self.current_version})...")
             if not shutil.which("curl"):
                 raise UpdateError("curl not found on this firmware.")
 
-            # The ONLY difference between the two channels: which release
-            # we read. Stable -> /releases/latest. Pre-release -> the
-            # newest entry in /releases that is flagged prerelease.
-            if prerelease:
+            # Stable = /releases/latest. Pre-release = newest entry in
+            # /releases flagged prerelease.
+            self.stable = None
+            self.prerelease = None
+
+            try:
+                self.stable = self._release_candidate(
+                    self._fetch_json(API_LATEST))
+            except UpdateError as exc:
+                self._say(f"stable check failed: {exc}")
+
+            try:
                 data = self._fetch_json(API_RELEASES)
-                rel = None
                 for r in (data if isinstance(data, list) else []):
                     if r.get("prerelease"):
-                        rel = r
+                        self.prerelease = self._release_candidate(r)
                         break
-                if rel is None:
-                    self._say("no pre-release found")
-                    self.state = UP_TO_DATE
-                    return
-            else:
-                rel = self._fetch_json(API_LATEST)
+            except UpdateError as exc:
+                self._say(f"pre-release check failed: {exc}")
 
-            tag = str(rel.get("tag_name", ""))
-            zip_asset = sha_asset = None
-            for a in rel.get("assets", []) or []:
-                name = str(a.get("name", ""))
-                if ASSET_RE.match(name):
-                    zip_asset = a
-                elif name.endswith(".zip.sha256"):
-                    sha_asset = a
-            if not tag or not zip_asset:
-                raise UpdateError("Release found but no port zip attached.")
-            if _version_tuple(tag) <= _version_tuple(self.current_version):
-                self._say(f"up to date (latest {kind} is {tag})")
+            if self.stable is None and self.prerelease is None:
+                raise UpdateError("No release with a port zip was found.")
+
+            cur = _version_tuple(self.current_version)
+            # Remember the newest stable that EXISTS (before we filter it
+            # out for not being newer). If the running build is ahead of
+            # it, the user is on the pre-release channel - that's how we
+            # label "You are running the latest Pre-Release".
+            if self.stable:
+                self._newest_stable_seen = self.stable["version"]
+            # Only offer what's actually NEWER than what's running. A
+            # pre-release older than the current build is not an "update"
+            # - and someone running a pre-release that's ahead of the
+            # newest stable should still see the stable offered only if
+            # it's genuinely newer.
+            if self.stable and _version_tuple(self.stable["version"]) <= cur:
+                self.stable = None
+            if self.prerelease and _version_tuple(self.prerelease["version"]) <= cur:
+                self.prerelease = None
+
+            self._say(
+                f"stable: {self.stable['version'] if self.stable else 'none newer'}   "
+                f"pre-release: "
+                f"{self.prerelease['version'] if self.prerelease else 'none newer'}")
+
+            if self.stable is None and self.prerelease is None:
                 self.state = UP_TO_DATE
                 return
-            self.latest_version = tag.lstrip("vV")
-            self._say(f"{kind} found: {tag} "
-                      f"({int(zip_asset.get('size', 0) or 0) // 1024} KB)")
-            self._asset_url = zip_asset.get("browser_download_url", "")
-            self._asset_size = int(zip_asset.get("size", 0) or 0)
-            self._sha_url = (sha_asset or {}).get("browser_download_url", "")
             self.state = AVAILABLE
         except UpdateError as exc:
             self._fail(str(exc))

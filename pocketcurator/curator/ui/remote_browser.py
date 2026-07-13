@@ -620,6 +620,8 @@ class RemoteBrowserScreen:
                         self.flagged_existing.add(self.selected)
             else:
                 self._activate()
+        elif k == pygame.K_TAB:
+            self._select_all_toggle()
         elif k == pygame.K_x:
             self._confirm_copy()
         elif k == pygame.K_y:
@@ -690,6 +692,32 @@ class RemoteBrowserScreen:
         self._desc_offset_px = 0.0
         self._desc_manual = False
         self._desc_pause_until = pygame.time.get_ticks() + 1200
+
+    def _select_all_toggle(self) -> None:
+        """Start: mark every game in this folder, or clear the marks if
+        they're all already marked.
+
+        Folders are never marked - only files. flagged_existing is kept
+        in step, since the copy screen uses it to tell the user how many
+        of their picks are already on the device.
+        """
+        selectable = [i for i, e in enumerate(self.entries) if not e.is_dir]
+        if not selectable:
+            self._toastline("Nothing here to select.")
+            return
+        if self.flagged >= set(selectable) and self.flagged:
+            self.flagged.clear()
+            self.flagged_existing.clear()
+            self._toastline("Selection cleared.")
+            return
+        self.flagged = set(selectable)
+        self.flagged_existing = {
+            i for i in selectable if self._exists_locally(self.entries[i])}
+        already = len(self.flagged_existing)
+        note = f"Selected {len(self.flagged)} games"
+        if already:
+            note += f" ({already} already on this device)"
+        self._toastline(note + ".")
 
     def _jump_to(self, index: int) -> None:
         if self.entries:
@@ -1117,6 +1145,7 @@ class RemoteBrowserScreen:
             return
         n = len(self.flagged)
         mark = f"A Mark ({n})" if n else "A Mark / Open"
-        legend = f"{mark}  -  X Copy  -  Y Jump  -  Sel Settings  -  B Back"
+        legend = (f"{mark}  -  Start All  -  X Copy  -  Y Jump  -  "
+                  f"Sel Settings  -  B Back")
         surface.blit(font.render(legend, True, fg),
                      (10, rect.y + (rect.h - font.get_height()) // 2))

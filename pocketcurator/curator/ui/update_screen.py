@@ -39,32 +39,57 @@ class UpdateScreen:
         """Progressive checklist derived from the updater's state."""
         u = self.updater
         s = u.state
-        lines = [("Checking for update...", True)]
+        lines = [("Checking for updates...", True)]
 
         if s == "checking":
             return lines, ""
+
         if s == "up_to_date":
+            kind = "Pre-Release" if u.running_prerelease() else "Stable Release"
             lines.append(
-                (f"You are running the latest version (v{u.current_version}).",
+                (f"You are running the latest {kind} (v{u.current_version}).",
                  True))
-            return lines, "Press A or B to close."
+            return lines, "Press B to close."
+
         if s == "error":
             lines.append(("Update failed:", True))
             return lines, "Press A to retry, B to close."
 
-        # available / downloading / verifying / staging / staged
+        if s == "available":
+            # One check, both channels. Show the truth about each, then
+            # let the user choose - rather than deciding for them.
+            keys = []
+            if u.stable:
+                lines.append((f"Stable Release available: "
+                              f"v{u.stable['version']}", True))
+                keys.append("A Install Stable")
+            else:
+                kind = ("Pre-Release" if u.running_prerelease()
+                        else "Stable Release")
+                lines.append((f"You are running the latest {kind} "
+                              f"(v{u.current_version}).", True))
+            if u.prerelease:
+                lines.append((f"Pre-Release available: "
+                              f"v{u.prerelease['version']} (not fully tested)",
+                              True))
+                keys.append("Y Install Pre-Release")
+            keys.append("B Cancel")
+            return lines, "   -   ".join(keys)
+
+        # downloading / verifying / staging / staged
+        label = u.channel_label()
         if u.latest_version:
-            lines.append((f"Update found: v{u.latest_version}", True))
-        if s in ("downloading",):
+            lines.append((f"Installing {label} v{u.latest_version}", True))
+        if s == "downloading":
             lines.append(
-                (f"Downloading update... {int(u.progress * 100)}%", True))
+                (f"Downloading... {int(u.progress * 100)}%", True))
             return lines, "You can press B to close - it keeps downloading."
         if s in ("verifying", "staging", "staged"):
-            lines.append(("Downloading update... 100%", True))
-            lines.append(("Verifying update...", True))
+            lines.append(("Downloading... 100%", True))
+            lines.append(("Verifying...", True))
         if s == "staged":
-            lines.append(("Update ready! Restart Pocket Curator to "
-                          "complete the update.", True))
+            lines.append((f"{label} v{u.latest_version} ready! Restart "
+                          f"Pocket Curator to complete the update.", True))
             return lines, "Press A or B to close."
         return lines, ""
 
@@ -73,13 +98,22 @@ class UpdateScreen:
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.KEYDOWN:
             return
-        if event.key == pygame.K_ESCAPE:
+        u = self.updater
+
+        if event.key == pygame.K_ESCAPE:          # B - always closes
             self.app.pop_screen()
-        elif event.key == pygame.K_RETURN:
-            if self.updater.state == "error":
-                self.updater.start_full(prerelease=getattr(self, "prerelease", False))
-            elif not self.updater.busy():
+
+        elif event.key == pygame.K_RETURN:        # A
+            if u.state == "error":
+                u.start_full()                    # retry the check
+            elif u.state == "available" and u.stable:
+                u.install("stable")               # take the stable release
+            elif not u.busy():
                 self.app.pop_screen()
+
+        elif event.key == pygame.K_y:             # Y - pre-release
+            if u.state == "available" and u.prerelease:
+                u.install("prerelease")
 
 
     def draw(self, surface: pygame.Surface) -> None:

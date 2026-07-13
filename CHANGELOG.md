@@ -2,6 +2,24 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.29] - 2026-07-13
+
+- New: a system that had no games at startup now appears as soon as you
+  copy games into it - no restart needed. This is the fresh-device path:
+  a handheld with no ROMs, connect to WebDAV, copy your first games, and
+  the system is there when you back out.
+- New: Start selects all games in the list (press again to clear).
+  Available on both the delete and the fetch screens, and shown in the
+  button legend.
+- Change: checking for updates now looks at BOTH channels at once and
+  lets you choose - A installs the Stable Release, Y installs the
+  Pre-Release (labelled "not fully tested"), B cancels. The status text
+  now says which channel you're running.
+- Change: a system you empty stays listed at 0 games until you restart,
+  so you can see what you removed and fetch straight back into it.
+- Fix: game counts are recalculated once when you leave the delete or
+  fetch screen, and never while a copy or delete is still running.
+
 ## [1.0.28] - 2026-07-13
 
 - Change: paging now moves the highlight to the leading edge of travel.

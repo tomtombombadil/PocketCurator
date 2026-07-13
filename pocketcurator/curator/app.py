@@ -352,6 +352,9 @@ class App:
         # when the user returns to the carousel. Keyed by resolved
         # system directory path.
         self.dirty_gamelists: set = set()
+        # Edge-detects the copy queue going busy -> idle, so we recount
+        # exactly once when a background copy lands.
+        self._fetch_was_busy = False
         # Set True once any game is copied from a WebDAV source this
         # session. main.py reads it (alongside deletions_occurred) to
         # decide whether the launcher should refresh EmulationStation so
@@ -392,6 +395,21 @@ class App:
         # Same defense in the other direction: holding B to back out
         # shouldn't immediately re-back-out from the underlying screen.
         self._swallowed_keys.update(self._held_keys)
+        # Back at the carousel: recount anything we changed while we were
+        # away (deleted games, copied games, a brand-new system). Done
+        # here - once, on return - rather than per frame.
+        self._refresh_carousel_if_top()
+
+    def _refresh_carousel_if_top(self) -> None:
+        if not self._screens:
+            return
+        top = self._screens[-1]
+        refresh = getattr(top, "refresh_counts", None)
+        if callable(refresh):
+            try:
+                refresh()
+            except Exception as exc:  # noqa: BLE001 - never crash on a recount
+                print(f"[app] carousel refresh failed: {exc}")
         if not self._screens:
             self._quit = True
 
@@ -799,6 +817,15 @@ class App:
                 break
 
             top = self._screens[-1]
+            # A background copy just finished while the user sat on the
+            # carousel: recount once, on the busy->idle edge. Edge-
+            # triggered, so we never re-parse a gamelist per frame.
+            q = getattr(self, "fetch_queue", None)
+            busy_now = bool(q is not None and q.busy())
+            if self._fetch_was_busy and not busy_now:
+                self._refresh_carousel_if_top()
+            self._fetch_was_busy = busy_now
+
             top.draw(self.surface)
             self._draw_global_fetch_progress(top)
             self._present()

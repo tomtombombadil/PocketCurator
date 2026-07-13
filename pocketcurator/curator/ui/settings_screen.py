@@ -169,12 +169,6 @@ class SettingsScreen:
             self.selected = len(self.options) - 1
         elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             self._adjust(+1 if event.key == pygame.K_RIGHT else -1)
-        elif event.key == pygame.K_y:
-            opt = self.options[self.selected]
-            if opt.get("label") == "Check For Updates":
-                _updater(self.app)
-                from .update_screen import UpdateScreen
-                self.app.push_screen(UpdateScreen(self.app, prerelease=True))
         elif event.key == pygame.K_x:
             opt = self.options[self.selected]
             if opt.get("label") == "Check For Updates":

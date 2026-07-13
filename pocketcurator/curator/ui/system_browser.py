@@ -195,22 +195,40 @@ class SystemBrowserScreen:
     # Drawing
     # ------------------------------------------------------------------
 
-    def _refresh_dirty_counts(self) -> None:
-        """Recount any system whose gamelist we changed this session.
+    def refresh_counts(self) -> None:
+        """Recount systems whose gamelist we changed, and pick up any
+        system that has just gained its first games.
 
-        The carousel's counts are computed once, at discovery. Delete 800
-        games and come back, and it would still show the startup number.
-        So the delete and fetch paths flag the systems they touched, and
-        we recount just those, here, on the way back.
+        Called ONCE when the user comes back to the carousel from the
+        delete or fetch screens - not per frame. If a copy or delete is
+        still running, we do nothing: the numbers would be wrong anyway,
+        and re-parsing a 1300-entry gamelist every frame would stutter
+        the carousel. The screens call this again when their work
+        finishes.
 
-        The recount is _count_candidates -> a pure gamelist.xml parse.
-        No filesystem scan: gamelist.xml is the source of truth, and we
-        keep it true by pruning entries when we delete a ROM and merging
-        one when we copy a ROM in. So parsing it is enough.
+        Two cases:
+          - a system we already know changed  -> recount it (a pure
+            gamelist.xml parse; no filesystem scan).
+          - a system we DON'T know changed    -> it had no games at
+            startup, so discovery skipped it, and the user has just
+            copied the first ROMs into it. Re-run discovery so it
+            appears without needing a restart.
         """
         dirty = getattr(self.app, "dirty_gamelists", None)
         if not dirty:
             return
+        q = getattr(self.app, "fetch_queue", None)
+        if q is not None and q.busy():
+            return          # work still in flight - recount when it lands
+
+        known = {str(Path(s.get("path", ""))) for s in self.systems}
+        unknown = [p for p in dirty if p not in known]
+
+        if unknown:
+            self._rediscover(unknown)
+            dirty.clear()
+            return
+
         from ..firmware import _count_candidates
         for system in self.systems:
             path = str(Path(system.get("path", "")))
@@ -226,8 +244,57 @@ class SystemBrowserScreen:
                 print(f"[discover] recount failed for {path}: {exc}")
         dirty.clear()
 
+    def _rediscover(self, new_paths) -> None:
+        """A system that was empty at startup now has games. Rebuild the
+        system list so it shows up right away.
+
+        Only happens on the rare 'first ROMs copied into a system that
+        had none' event - notably the fresh-device path, where the user
+        has no systems at all, connects to WebDAV, and copies their first
+        games. Without this they'd have to relaunch to see them.
+
+        Systems the user emptied THIS session are kept, showing 0 games,
+        so they can see what they did and press Y to fetch straight back
+        into them. They disappear on the next launch, like any empty
+        system.
+        """
+        from ..firmware import discover_systems
+        print(f"[discover] new system(s) gained games: {new_paths} - "
+              f"re-running discovery")
+        keep_shortname = (self.systems[self.selected].get("shortname")
+                          if self.systems else None)
+        try:
+            fresh = discover_systems(self.app.roms_dir, self.app.systems_db)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[discover] re-discovery failed: {exc}")
+            return
+
+        # Carry over any system we're already showing that discovery now
+        # drops for having 0 games - the user emptied it this session and
+        # should still see it (at 0) until restart.
+        fresh_paths = {str(Path(s["path"])) for s in fresh}
+        for old in self.systems:
+            if str(Path(old.get("path", ""))) not in fresh_paths:
+                old["rom_count"] = 0
+                fresh.append(old)
+                print(f"[discover] keeping emptied system "
+                      f"{old.get('shortname')} visible at 0 games")
+
+        fresh.sort(key=lambda s: (s.get("display") or "").lower())
+        self.systems = fresh
+        self.app.systems = fresh
+
+        # Keep the cursor on the system the user was looking at.
+        self.selected = 0
+        if keep_shortname:
+            for i, s in enumerate(fresh):
+                if s.get("shortname") == keep_shortname:
+                    self.selected = i
+                    break
+        self._logo_paths = {}
+        print(f"[discover] carousel rebuilt: {len(fresh)} systems")
+
     def draw(self, surface):
-        self._refresh_dirty_counts()
         cfg = self.app.config
         theme = cfg["theme"]
         ui = cfg["ui"]

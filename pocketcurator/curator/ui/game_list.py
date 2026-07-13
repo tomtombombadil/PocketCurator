@@ -109,6 +109,8 @@ class GameListScreen:
             self._jump_to(0)
         elif key == pygame.K_END:
             self._jump_to(len(self.games) - 1)
+        elif key == pygame.K_TAB:
+            self._select_all_toggle()
         elif key == pygame.K_RETURN:
             # A button.
             #
@@ -321,6 +323,24 @@ class GameListScreen:
             self.selected = min(new_scroll, last)                 # top row
         else:
             self.selected = min(new_scroll + visible - 1, last)   # bottom row
+
+    def _select_all_toggle(self) -> None:
+        """Start: mark every game, or clear the marks if all are already
+        marked. A toggle rather than a one-way select-all, so the same
+        button undoes it - there's no other way to unmark 1300 games.
+
+        Structured so Start can later open a menu (Select All / Select
+        None / Show Size Of Selected) without reworking the callers.
+        """
+        if not self.games:
+            return
+        if len(self.flagged) == len(self.games):
+            self.flagged.clear()
+            print("[game_list] select-all: cleared all marks")
+        else:
+            self.flagged = set(range(len(self.games)))
+            print(f"[game_list] select-all: marked {len(self.flagged)} games")
+        self._marquee_anchor_ms = pygame.time.get_ticks()
 
     def _jump_to(self, idx: int) -> None:
         if not self.games:
@@ -669,6 +689,7 @@ class GameListScreen:
 
         items = [
             "A Mark",
+            "Start All",
             "B Back",
             delete_hint,
             "Y Jump",
