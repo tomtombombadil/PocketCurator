@@ -128,6 +128,16 @@ def load_gamelist(system_dir: Path,
     if dropped:
         print(f"[gamelist] dropped {dropped} entries with missing ROM file "
               f"under {system_dir.name}")
+        # Name them. A gamelist entry with no ROM behind it is exactly
+        # the drift that makes our count disagree with ES (ES hides
+        # these; a raw entry count does not), so knowing WHICH games are
+        # affected is the difference between diagnosing and guessing.
+        # Capped so a badly-out-of-sync system can't flood the log.
+        missing = [g for g in games.values() if str(g.rom_path) not in existing]
+        for g in missing[:25]:
+            print(f"[gamelist]   no ROM on disk: {g.rom_path}")
+        if len(missing) > 25:
+            print(f"[gamelist]   ... and {len(missing) - 25} more")
     t_filter = time.monotonic() - t_filter
 
     t_total = time.monotonic() - t_start

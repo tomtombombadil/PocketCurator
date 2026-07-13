@@ -49,6 +49,66 @@ CARRIED_FIELDS = (
 KEEP_BACKUPS = 3
 
 
+def write_gamelist_tree(tree: ET.ElementTree, dest: Path) -> None:
+    """Write a gamelist tree the way EmulationStation writes it.
+
+    ElementTree's tree.write() does NOT pretty-print: any element we
+    append has no tail whitespace, so it lands as one unbroken line.
+    That's how Pocket Curator ended up writing ~1200 single-line <game>
+    entries into a gamelist whose ES-written entries were properly
+    indented - the file stayed valid XML, but became unreadable and
+    un-diffable next to ES's own output.
+
+    ES (Batocera lineage, which ROCKNIX/Knulli follow) serialises with
+    pugixml, whose default indent is a single TAB and which puts every
+    node on its own line:
+
+        <?xml version="1.0"?>
+        <gameList>
+        \t<game>
+        \t\t<path>./Game.zip</path>
+        \t\t<name>Game</name>
+        \t</game>
+        </gameList>
+
+    So: indent with tabs, one tag per line, and emit pugixml's bare
+    declaration rather than ElementTree's `<?xml version='1.0'
+    encoding='utf-8'?>` (single-quoted, with an encoding ES never
+    writes). UTF-8 with no declared encoding is exactly what ES emits
+    and is valid XML - UTF-8 is the spec default.
+
+    ET.indent() needs Python 3.9+; the device runtime is 3.11, but a
+    manual fallback keeps an older interpreter from silently regressing
+    us to the unreadable one-line format.
+    """
+    root = tree.getroot()
+    try:
+        ET.indent(tree, space="\t")          # py3.9+
+    except AttributeError:
+        _indent_fallback(root)
+
+    with open(dest, "wb") as fh:
+        fh.write(b'<?xml version="1.0"?>\n')
+        tree.write(fh, encoding="utf-8", xml_declaration=False)
+        fh.write(b"\n")
+
+
+def _indent_fallback(elem: ET.Element, level: int = 0) -> None:
+    """Tab-indent in place, for interpreters without ET.indent()."""
+    pad = "\n" + "\t" * level
+    if len(elem):
+        if not (elem.text or "").strip():
+            elem.text = pad + "\t"
+        for child in elem:
+            _indent_fallback(child, level + 1)
+            if not (child.tail or "").strip():
+                child.tail = pad + "\t"
+        if not (elem[-1].tail or "").strip():
+            elem[-1].tail = pad
+    if level and not (elem.tail or "").strip():
+        elem.tail = pad
+
+
 def _log(msg: str) -> None:
     print(f"[gamelist-merge] {msg}")
 
@@ -193,7 +253,7 @@ def merge_entries(system_dir: Path, entry_xmls: List[str],
         return 0
     tmp = gl.with_name("gamelist.xml.pc-merge-tmp")
     try:
-        tree.write(str(tmp), encoding="utf-8", xml_declaration=True)
+        write_gamelist_tree(tree, tmp)
         tmp.replace(gl)
         _log(f"wrote {written} entr{'y' if written == 1 else 'ies'} "
              f"into {gl}")
@@ -256,7 +316,7 @@ def prune_entries(system_dir: Path, rom_paths: List[Path]) -> int:
 
     tmp = gl.with_name("gamelist.xml.pc-prune-tmp")
     try:
-        tree.write(str(tmp), encoding="utf-8", xml_declaration=True)
+        write_gamelist_tree(tree, tmp)
         tmp.replace(gl)
         _log(f"pruned {removed} deleted entr{'y' if removed == 1 else 'ies'} "
              f"from {gl}")

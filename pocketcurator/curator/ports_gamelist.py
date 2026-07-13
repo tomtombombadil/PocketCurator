@@ -394,7 +394,13 @@ def _atomic_write_text(target: Path, content: str) -> None:
 
 
 def _atomic_write_tree(target: Path, tree: ET.ElementTree) -> None:
-    """Write ElementTree to target via temp file + rename."""
+    """Write ElementTree to target via temp file + rename.
+
+    Uses the shared ES-style writer (tab-indented, one tag per line,
+    pugixml-style declaration) so our Ports entry is formatted exactly
+    like every other gamelist ES maintains - not as one long line.
+    """
+    from .gamelist_merge import write_gamelist_tree
     tmp = target.with_name(target.name + ".pcr-tmp")
-    tree.write(tmp, encoding="utf-8", xml_declaration=True)
+    write_gamelist_tree(tree, Path(tmp))
     os.replace(tmp, target)

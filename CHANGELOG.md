@@ -2,6 +2,16 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.24] - 2026-07-13
+
+- Fix: gamelist.xml entries written by Pocket Curator are now formatted
+  the way EmulationStation formats them - tab-indented, one tag per
+  line. Previously each entry Pocket Curator added was written as a
+  single unbroken line, leaving the file valid but unreadable next to
+  ES's own entries.
+- When a system is opened, any gamelist entry whose ROM is missing from
+  the card is now named in the log, not just counted.
+
 ## [1.0.23] - 2026-06-18
 
 - Fix: deleting a game now also removes its entry from gamelist.xml.
