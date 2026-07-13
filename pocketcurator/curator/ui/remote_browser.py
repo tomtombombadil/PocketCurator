@@ -166,6 +166,14 @@ def _format_region(region: str) -> str:
     return "".join(out)
 
 
+def _norm(name: str) -> str:
+    """Fold a folder name for comparison: lowercase, punctuation removed.
+    'PC-Engine', 'pc engine' and 'pcengine' are the same system - without
+    this, every server folder named with a hyphen or a space fails to
+    route."""
+    return "".join(ch for ch in (name or "").lower() if ch.isalnum())
+
+
 def expand_names(name: str):
     """name + every alias of it, lowercased - from BOTH the hand-curated
     firmware matrix (system_matrix.csv, authoritative) and the built-in
@@ -260,9 +268,11 @@ class RemoteBrowserScreen:
         # ship region variants as separate systems (ROCKNIX has both
         # megadrive AND genesis, nes AND famicom): a remote 'genesis'
         # folder must hit the device's genesis, not megadrive-by-alias.
+        # Keys are NORMALISED (lowercase, no punctuation) so 'pc-engine',
+        # 'pc engine' and 'pcengine' all land on the same system.
         for s in self.all_systems:                       # pass 1: exact
-            out.setdefault(s["shortname"].lower(), s)
-            leaf = Path(str(s.get("path", ""))).name.lower()
+            out.setdefault(_norm(s["shortname"]), s)
+            leaf = _norm(Path(str(s.get("path", ""))).name)
             if leaf:
                 out.setdefault(leaf, s)
         for s in self.all_systems:                       # pass 2: aliases
@@ -271,19 +281,116 @@ class RemoteBrowserScreen:
             if leaf:
                 names |= expand_names(leaf)
             for n in names:
-                out.setdefault(n, s)
+                out.setdefault(_norm(n), s)
         return out
 
     def _context_for(self, href: str) -> Optional[dict]:
-        """Deepest path segment that names one of the device's systems
-        wins. '/stuff/roms/amiga' -> the device's amiga system."""
+        """Which of the device's systems should this remote folder's games
+        land in?
+
+        Deepest matching path segment wins ('/stuff/roms/amiga' -> amiga).
+        But some consoles ship under two names on the SAME device -
+        ROCKNIX has both `genesis` and `megadrive`, both `tg16` and
+        `pcengine` - and the right destination then depends on the
+        DEVICE, not on whatever the server happened to call the folder.
+        A US handheld's frontend uses `genesis`; dropping Mega Drive ROMs
+        into `megadrive` would bury them in a folder that user never
+        looks at.
+
+        So when the matched folder belongs to a hardware family with more
+        than one possible home on this device, we resolve it (see
+        _resolve_family). Everything else routes exactly as before.
+        """
         lookup = self._system_lookup()
         decoded = urllib.parse.unquote(href)
         for seg in reversed([s for s in decoded.split("/") if s]):
-            hit = lookup.get(seg.lower())
+            hit = lookup.get(_norm(seg))
             if hit is not None:
-                return hit
+                return self._resolve_family(seg, hit)
         return None
+
+    def _resolve_family(self, remote_name: str, hit: dict) -> dict:
+        """Pick the right home when a console has two folders on this device.
+
+        Precedence - a FACT about the user's device always beats a guess:
+
+          1. Only one folder of the family exists here -> use it.
+             (Batocera only ships `megadrive`. Nothing to decide.)
+          2. Several exist and one already holds games -> use that one.
+             The user has already voted with their library; adding to the
+             other folder would split it in half. This is why a US user
+             who keeps everything in `megadrive` keeps getting `megadrive`.
+          3. Several exist, all empty -> use the device's region.
+             The fresh-device case: a US handheld gets `genesis`.
+          4. Region unknown -> match the folder name literally
+             (megadrive -> megadrive). Don't guess.
+
+        No prompts, no choices: the user browses to `megadrive` on their
+        server, copies, and the files land where their frontend will
+        actually show them.
+        """
+        try:
+            from ..system_matrix import get_matrix, region_bucket
+            matrix = get_matrix()
+            family = matrix.family_for(remote_name)
+            if not family:
+                return hit
+
+            # Which of the device's systems belong to this family?
+            members = [s for s in self.all_systems
+                       if matrix.family_for(s.get("shortname", "")) == family
+                       or matrix.family_for(
+                           Path(str(s.get("path", ""))).name) == family]
+            if len(members) <= 1:
+                return members[0] if members else hit          # rule 1
+
+            # rule 2 - follow the existing library
+            populated = []
+            for s in members:
+                try:
+                    from ..firmware import _count_candidates
+                    n = _count_candidates(Path(str(s["path"])),
+                                          s.get("extensions") or [])
+                except Exception:  # noqa: BLE001
+                    n = int(s.get("rom_count") or 0)
+                if n > 0:
+                    populated.append((n, s))
+            if len(populated) == 1:
+                chosen = populated[0][1]
+                print(f"[fetch] '{remote_name}' -> {chosen['shortname']} "
+                      f"(already holds this library)")
+                return chosen
+            if len(populated) > 1:
+                # Split library (rare). Prefer the folder the server
+                # named; don't silently shuffle games between them.
+                for _, s in populated:
+                    if _norm(s.get("shortname", "")) == _norm(remote_name):
+                        return s
+                chosen = max(populated, key=lambda t: t[0])[1]
+                print(f"[fetch] '{remote_name}' -> {chosen['shortname']} "
+                      f"(games in both folders; picked the larger)")
+                return chosen
+
+            # rule 3 - nothing here yet: the device's region decides
+            region = region_bucket(getattr(self.app, "artwork_region", None))
+            if region:
+                for s in members:
+                    if region in matrix.regions_for(s.get("shortname", "")):
+                        print(f"[fetch] '{remote_name}' -> {s['shortname']} "
+                              f"(region {region})")
+                        return s
+
+            # rule 4 - no region: take the name at face value
+            for s in members:
+                if _norm(s.get("shortname", "")) == _norm(remote_name):
+                    print(f"[fetch] '{remote_name}' -> {s['shortname']} "
+                          f"(region unknown; matched folder name)")
+                    return s
+            return hit
+        except Exception as exc:  # noqa: BLE001 - routing must never crash a copy
+            print(f"[fetch] family resolution failed for "
+                  f"'{remote_name}': {exc}")
+            return hit
 
     # ------------------------------------------------------------------
     # Listing + navigation

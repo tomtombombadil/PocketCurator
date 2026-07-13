@@ -2,6 +2,23 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.30] - 2026-07-13
+
+- New: fetched games now land in the folder your handheld actually uses
+  for that console. Some consoles ship under two names on the same device
+  (genesis/megadrive, tg16/pcengine); Pocket Curator now picks the right
+  one for your device instead of blindly copying the server's folder
+  name. If a system already holds games, new games join them. If both
+  folders are empty, your region decides. If the region can't be
+  determined, the folder name is matched as-is. No prompts - it just goes
+  where it belongs.
+- Fix: server folders named with spaces, hyphens or underscores now
+  match ("PC-Engine", "pc engine" and "pcengine" are the same system).
+- Fix: locale and nickname folder names now route correctly, including
+  turbografx, tg-16, pce, pcecd, sgx, markiii, super-famicom and famicom.
+- Change: the firmware folder table and the system alias list are now one
+  file (system_matrix.csv), so they can't drift apart.
+
 ## [1.0.29] - 2026-07-13
 
 - New: a system that had no games at startup now appears as soon as you
