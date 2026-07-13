@@ -2,6 +2,20 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.27] - 2026-07-13
+
+- Fix: L1/R1 paging in the game list skipped games. The page size was
+  calculated from the screen height without allowing for the header and
+  footer bars, so it jumped further than a screenful (16 rows when 14
+  were showing) - meaning an entire screen of games could scroll past
+  unseen. Paging now uses the real number of rows on screen.
+- Change: paging now simply turns the page - it shows the next (or
+  previous) screenful and leaves the highlight where it sits, instead of
+  also yanking the selection to the top/bottom, which compounded the
+  overshoot.
+- Fix: the same correction applied to the WebDAV fetch list, which paged
+  by a fixed 12 rows regardless of how many were actually displayed.
+
 ## [1.0.26] - 2026-07-13
 
 - Fix: the game count on the system selection screen now updates after

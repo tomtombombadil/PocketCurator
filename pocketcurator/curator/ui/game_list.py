@@ -283,15 +283,19 @@ class GameListScreen:
     def _page(self, direction: int) -> None:
         """Page down (direction +1) or page up (direction -1).
 
-        The point of paging in a curation app is to scan through a
-        long list quickly while deleting as you go. So:
-          - PgDn: jump forward by one full page, put the new selection
-            at the TOP of the visible area. The user can then walk down
-            through the page deleting things without ever having to
-            arrow back up.
-          - PgUp: jump backward by one full page, put the new selection
-            at the BOTTOM of the visible area. Same logic in reverse -
-            the user walks back up through the page deleting.
+        A page turn shows the NEXT screen's worth of games - no more, no
+        less. Nothing is skipped: the row after the last one you could
+        see becomes the first one you can see.
+
+        The highlight is NOT dragged to the top (or bottom). It keeps
+        its position within the window, so paging is purely "turn the
+        page" - where the cursor sits on that page is a separate concern
+        from which games are listed. The old behaviour moved the
+        selection a full page AND then re-anchored the scroll to it,
+        which skipped roughly an entire screen of games per press.
+
+        At the ends, the window clamps and the selection settles on the
+        first/last game rather than running off.
         """
         if not self.games:
             return
@@ -299,17 +303,20 @@ class GameListScreen:
         last = len(self.games) - 1
         max_scroll = max(0, len(self.games) - visible)
 
-        if direction > 0:
-            new_sel = min(last, self.selected + visible)
-            # Selection at top of the new page; scroll matches it,
-            # clamped to max_scroll so we don't blank out the bottom.
-            self.scroll = min(new_sel, max_scroll)
-            self.selected = new_sel
-        else:
-            new_sel = max(0, self.selected - visible)
-            # Selection at bottom of the new page.
-            self.scroll = max(0, new_sel - visible + 1)
-            self.selected = new_sel
+        # Where the cursor sits within the visible window (0 = top row).
+        offset = min(max(self.selected - self.scroll, 0), visible - 1)
+
+        new_scroll = self.scroll + direction * visible
+        new_scroll = max(0, min(new_scroll, max_scroll))
+
+        # Same row on the new page...
+        new_sel = new_scroll + offset
+        # ...but never past the end of the list, and never outside the
+        # window we just scrolled to.
+        new_sel = max(new_scroll, min(new_sel, min(last, new_scroll + visible - 1)))
+
+        self.scroll = new_scroll
+        self.selected = new_sel
 
     def _jump_to(self, idx: int) -> None:
         if not self.games:
@@ -354,8 +361,23 @@ class GameListScreen:
         self._last_selection = -1  # force redraw of right panel
 
     def _visible_count(self) -> int:
-        font_h = self.app.fonts.get(self.app.config["ui"]["font_size_base"]).get_linesize()
-        avail = self.app.screen_h - max(28, self.app.config["ui"]["font_size_base"] + 8)
+        """Rows of the game list actually on screen.
+
+        Prefer the count measured during the last draw - that's derived
+        from the real list rect, so it can't drift from what the user
+        sees. The estimate below is only used before the first frame; it
+        subtracts BOTH chrome bars (the mode header and the legend
+        footer), which the old version forgot to do.
+        """
+        measured = getattr(self, "_rows_visible", 0)
+        if measured:
+            return measured
+        ui = self.app.config["ui"]
+        base = ui["font_size_base"]
+        font_h = self.app.fonts.get(base).get_linesize()
+        header_h = self.app.fonts.get(max(14, int(base * 0.95))).get_linesize() + 8
+        legend_h = max(28, base + 8)
+        avail = self.app.screen_h - header_h - legend_h
         return max(1, avail // font_h)
 
     # ------------------------------------------------------------------
@@ -369,6 +391,13 @@ class GameListScreen:
         font = self.app.fonts.get(ui["font_size_base"])
         line_h = font.get_linesize()
         visible = max(1, rect.height // line_h)
+        # Publish the REAL row count, measured from the actual list rect
+        # (which already has the header strip and the legend footer
+        # subtracted). Paging used to re-derive this from screen height
+        # minus one bar, so it thought 16 rows fitted when 14 were drawn
+        # - and every PgUp/PgDn overshot by exactly that difference.
+        # One source of truth: what we draw is what we page by.
+        self._rows_visible = visible
 
         # Adjust scroll if window has resized
         if self.selected < self.scroll:

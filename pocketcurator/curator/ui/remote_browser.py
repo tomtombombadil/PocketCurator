@@ -596,9 +596,9 @@ class RemoteBrowserScreen:
         elif k == pygame.K_UP:
             self._move(-1)
         elif k == pygame.K_PAGEDOWN:
-            self._move(+12)
+            self._page(+1)
         elif k == pygame.K_PAGEUP:
-            self._move(-12)
+            self._page(-1)
         elif k == pygame.K_HOME:
             self._jump_to(0)
         elif k == pygame.K_END:
@@ -656,6 +656,32 @@ class RemoteBrowserScreen:
             self.selected = (self.selected + d) % n
         else:
             self.selected = max(0, min(n - 1, self.selected + d))
+        self._preview_due_ms = pygame.time.get_ticks() + PREVIEW_DEBOUNCE_MS
+        self._desc_offset_px = 0.0
+        self._desc_manual = False
+        self._desc_pause_until = pygame.time.get_ticks() + 1200
+
+    def _page(self, direction: int) -> None:
+        """Turn one page of the remote listing.
+
+        Same rule as the deletion list: show the NEXT screenful, skip
+        nothing, and leave the highlight where it sits on the page. Was
+        a hardcoded 12-row jump, which matched no actual screen and
+        either skipped rows or under-shot depending on the device.
+        """
+        if not self.entries:
+            return
+        visible = max(1, getattr(self, "_rows_visible", 1))
+        last = len(self.entries) - 1
+        max_scroll = max(0, len(self.entries) - visible)
+
+        offset = min(max(self.selected - self.scroll, 0), visible - 1)
+        new_scroll = max(0, min(self.scroll + direction * visible, max_scroll))
+        new_sel = new_scroll + offset
+        new_sel = max(new_scroll, min(new_sel, min(last, new_scroll + visible - 1)))
+
+        self.scroll = new_scroll
+        self.selected = new_sel
         self._preview_due_ms = pygame.time.get_ticks() + PREVIEW_DEBOUNCE_MS
         self._desc_offset_px = 0.0
         self._desc_manual = False
@@ -845,6 +871,10 @@ class RemoteBrowserScreen:
 
         line_h = font.get_linesize() + 4
         visible = max(1, rect.h // line_h)
+        # Real row count, measured from the list rect that's actually
+        # drawn (header and footer already subtracted). Paging reads
+        # this instead of guessing.
+        self._rows_visible = visible
         if self.selected < self.scroll:
             self.scroll = self.selected
         if self.selected >= self.scroll + visible:
