@@ -12,6 +12,7 @@ import pygame
 
 from ..deleter import delete_paths
 from ..gamelist import Game
+from ..gamelist_merge import backup_gamelist, prune_entries
 from ..media import (
     gather_files_to_delete_batch,
     humanize_bytes,
@@ -140,6 +141,27 @@ class ConfirmDeleteScreen:
               f"games_marked={total_games} games_removed={len(deleted_games)} "
               f"games_failed={len(failed_games)} files_deleted={file_deleted} "
               f"files_skipped={file_skipped} files_failed={file_failed}")
+
+        # Keep gamelist.xml TRUE. It is the source of truth - for ES and
+        # for us - so a ROM we removed must not keep its <game> entry, or
+        # the system count reads high and the dead entry lingers. Prune
+        # only the games whose ROM is really gone; a failed delete keeps
+        # its entry, exactly as it should. Backup first (same convention
+        # as a fetch merge), and never let a gamelist problem undo the
+        # deletion that already succeeded. ES picks the change up via the
+        # reload/refresh Pocket Curator already triggers on exit.
+        pruned = 0
+        if not dry and deleted_games:
+            try:
+                backup_gamelist(Path(self.app.port_dir), self.system)
+                pruned = prune_entries(
+                    Path(self.system["path"]),
+                    [g.rom_path for g in deleted_games],
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"[delete] gamelist prune failed (ROMs are still "
+                      f"deleted): {exc}")
+        print(f"[delete] gamelist entries pruned={pruned}")
 
         # Flag for the launcher's exit-time ES refresh: only when this was
         # a real run that actually removed something.

@@ -362,20 +362,22 @@ def _count_candidates(system_dir: Path, extensions: List[str]) -> int:
 
 def _count_from_gamelist(system_dir: Path) -> int:
     """
-    Count <game> entries whose ROM file actually exists on disk.
+    Count <game> entries in the gamelist that have a <path>. Does not
+    stat the path - if the user has gone to the trouble of scraping a
+    gamelist, we trust it lists real games. Per-entry stat checks made
+    this O(N) in disk seeks on slow SD cards for no real benefit during
+    discovery.
 
-    gamelist.xml is the source of truth for WHAT is a game, but it is NOT
-    pruned when the user deletes ROMs in-session (ES owns that, and only
-    rewrites the file on its own rescan). Counting raw <game> entries
-    therefore OVER-reports after deletions - the carousel showed ~1300
-    for a GBA folder that held ~500 ROMs, while ES (which hides
-    missing-ROM entries) correctly showed ~500. We now match that: count
-    only entries whose ROM is present, exactly like load_gamelist (the
-    in-system list) already does.
+    gamelist.xml is the source of truth, exactly as it is for
+    EmulationStation. Do NOT add a filesystem scan here to "verify" the
+    count: discovery runs over EVERY system at startup, and that cost is
+    precisely what makes the app slow to load. The only sanctioned
+    exception is the small-count ghost guard below.
 
-    Cost stays low: one os.scandir() per UNIQUE parent directory (ROMs
-    almost always sit in one dir per system), not a stat() per file - so
-    even a 1500-game library is one directory read, no per-file seeks.
+    Keeping the count honest is instead the job of whoever changes the
+    ROMs: when Pocket Curator deletes a ROM it now also removes that
+    game's <game> entry from gamelist.xml (gamelist_merge.prune_entries),
+    so the source of truth stays TRUE and this stays a pure parse.
     """
     gl = system_dir / "gamelist.xml"
     if not gl.is_file():
@@ -387,38 +389,36 @@ def _count_from_gamelist(system_dir: Path) -> int:
     except (ET.ParseError, OSError):
         return 0
 
-    rom_paths = []
+    paths = []
     for game in tree.getroot().iter("game"):
         path_el = game.find("path")
         if path_el is not None and path_el.text and path_el.text.strip():
-            rel = path_el.text.strip()
-            if rel.startswith("./"):
-                rel = rel[2:]
-            rom = Path(rel) if Path(rel).is_absolute() else (system_dir / rel)
-            rom_paths.append(rom)
+            paths.append(path_el.text.strip())
+    count = len(paths)
 
-    if not rom_paths:
-        return 0
-
-    # One scandir per unique parent; membership test by full path string,
-    # the same comparison load_gamelist uses so the two never disagree.
-    existing: set = set()
-    for parent in {p.parent for p in rom_paths}:
-        try:
-            with os.scandir(parent) as it:
-                for entry in it:
-                    try:
-                        if entry.is_file(follow_symlinks=False):
-                            existing.add(entry.path)
-                    except OSError:
-                        continue
-        except OSError:
-            continue
-
-    present = sum(1 for p in rom_paths if str(p) in existing)
-    missing = len(rom_paths) - present
-    if missing:
-        print(f"[discover] {system_dir.name}: {len(rom_paths)} gamelist "
-              f"entr{'y' if len(rom_paths) == 1 else 'ies'}, {present} with "
-              f"a ROM on disk ({missing} stale - not counted).")
-    return present
+    # Ghost-system guard. Some firmwares (notably Batocera) ship a few
+    # stock gamelist entries whose ROM files don't actually exist -
+    # Megadrive "Old Towers", PCEngine "Reflectron"/"Santatlanean", and
+    # single-game ports like Half-Life. They make an otherwise-empty
+    # system look "live" with 1-5 games, but entering it shows nothing.
+    # gamelist.xml stays our source of truth for normal systems, but for
+    # a SMALL system (<=5 games) we cheaply confirm at least one listed
+    # ROM exists on disk; if none do, treat the system as empty so it
+    # isn't offered. We cap the check at 5 so big libraries never pay the
+    # per-file stat cost during discovery.
+    if 0 < count <= 5:
+        any_exists = False
+        for rel in paths:
+            rom = (system_dir / rel) if not Path(rel).is_absolute() else Path(rel)
+            try:
+                if rom.exists():
+                    any_exists = True
+                    break
+            except OSError:
+                continue
+        if not any_exists:
+            print(f"[discover] {system_dir.name}: {count} gamelist "
+                  f"entr{'y' if count == 1 else 'ies'} but no ROM files "
+                  f"on disk - treating as empty (ghost system).")
+            return 0
+    return count

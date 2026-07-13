@@ -202,3 +202,66 @@ def merge_entries(system_dir: Path, entry_xmls: List[str],
         tmp.unlink(missing_ok=True)
         return 0
     return written
+
+
+def prune_entries(system_dir: Path, rom_paths: List[Path]) -> int:
+    """Remove the <game> entries for ROMs we deleted. Returns how many
+    entries were removed.
+
+    Why this exists: gamelist.xml is the source of truth - for
+    EmulationStation and for us. Deleting a ROM while leaving its entry
+    behind makes that source of truth LIE, and everything downstream
+    inherits the lie: the system count reads high, and the stale entry
+    sits there until something else rescans. The fix is not to go
+    double-checking the filesystem (discovery walks every system, so
+    scanning is exactly what makes the app slow to load) - it is to keep
+    the gamelist honest at the moment we change the disk.
+
+    Matching is by resolved ROM path, the same resolution load_gamelist
+    uses (absolute as-is; otherwise system_dir / path, with a leading
+    "./" stripped), so an entry is only ever removed when it really is
+    the game whose file we just unlinked.
+
+    Same safety properties as merge_entries: backup already taken by the
+    caller for this system this session, atomic temp-file + rename, and
+    every failure logged and swallowed - a gamelist problem must never
+    undo a deletion that already succeeded.
+    """
+    gl = Path(system_dir) / "gamelist.xml"
+    if not gl.is_file() or not rom_paths:
+        return 0
+
+    targets = {str(Path(p)) for p in rom_paths}
+
+    try:
+        tree = ET.parse(str(gl))
+        root = tree.getroot()
+    except (ET.ParseError, OSError) as exc:
+        _log(f"can't read {gl}: {exc} - skipping prune")
+        return 0
+
+    removed = 0
+    for game in list(root.findall("game")):
+        raw = (game.findtext("path") or "").strip()
+        if not raw:
+            continue
+        rel = raw[2:] if raw.startswith("./") else raw
+        resolved = Path(rel) if Path(rel).is_absolute() else (Path(system_dir) / rel)
+        if str(resolved) in targets:
+            root.remove(game)
+            removed += 1
+
+    if not removed:
+        return 0
+
+    tmp = gl.with_name("gamelist.xml.pc-prune-tmp")
+    try:
+        tree.write(str(tmp), encoding="utf-8", xml_declaration=True)
+        tmp.replace(gl)
+        _log(f"pruned {removed} deleted entr{'y' if removed == 1 else 'ies'} "
+             f"from {gl}")
+    except OSError as exc:
+        _log(f"prune write FAILED for {gl}: {exc}")
+        tmp.unlink(missing_ok=True)
+        return 0
+    return removed
