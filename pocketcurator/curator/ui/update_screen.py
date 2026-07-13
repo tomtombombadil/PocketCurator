@@ -36,7 +36,14 @@ class UpdateScreen:
     # ------------------------------------------------------------------
 
     def _lines(self):
-        """Progressive checklist derived from the updater's state."""
+        """Progressive checklist derived from the updater's state.
+
+        Rule: never call the running build "the latest" while offering an
+        update to it. The status line only earns "(latest)" when the
+        channel the user is ON has nothing newer. Saying "you're running
+        the latest Pre-Release" and then offering a newer Pre-Release in
+        the next breath is nonsense.
+        """
         u = self.updater
         s = u.state
         lines = [("Checking for updates...", True)]
@@ -44,8 +51,9 @@ class UpdateScreen:
         if s == "checking":
             return lines, ""
 
+        kind = "Pre-Release" if u.running_prerelease() else "Stable Release"
+
         if s == "up_to_date":
-            kind = "Pre-Release" if u.running_prerelease() else "Stable Release"
             lines.append(
                 (f"You are running the latest {kind} (v{u.current_version}).",
                  True))
@@ -56,18 +64,21 @@ class UpdateScreen:
             return lines, "Press A to retry, B to close."
 
         if s == "available":
-            # One check, both channels. Show the truth about each, then
-            # let the user choose - rather than deciding for them.
+            # Is the channel the user is ON up to date? Only then may the
+            # status line say so. A newer release on the OTHER channel
+            # doesn't make the running build stale.
+            own_channel_current = (
+                u.prerelease is None if u.running_prerelease()
+                else u.stable is None)
+            suffix = " (latest)" if own_channel_current else ""
+            lines.append(
+                (f"Running {kind} v{u.current_version}{suffix}.", True))
+
             keys = []
             if u.stable:
                 lines.append((f"Stable Release available: "
                               f"v{u.stable['version']}", True))
                 keys.append("A Install Stable")
-            else:
-                kind = ("Pre-Release" if u.running_prerelease()
-                        else "Stable Release")
-                lines.append((f"You are running the latest {kind} "
-                              f"(v{u.current_version}).", True))
             if u.prerelease:
                 lines.append((f"Pre-Release available: "
                               f"v{u.prerelease['version']} (not fully tested)",

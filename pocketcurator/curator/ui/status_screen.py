@@ -43,23 +43,6 @@ class StatusScreen:
         self._clock = ("Synced (secure connections OK)" if clock_is_sane()
                        else "Not synced - secure connections may fail")
 
-    def _update_status(self) -> str:
-        """Report the LATEST KNOWN update state without checking again -
-        Check For Updates already does that. If no check has run this
-        session, say so rather than reaching out to the network."""
-        u = getattr(self.app, "updater", None)
-        if u is None:
-            return "not checked this session"
-        if u.state == "staged":
-            return f"v{u.latest_version} ready - restart to apply"
-        if u.state == "available":
-            return f"v{u.latest_version} available"
-        if u.state == "up_to_date":
-            return "up to date"
-        if u.busy():
-            return "checking..."
-        return "not checked this session"
-
     def _sd_free_text(self) -> str:
         """Free space on the volume that holds the ROMs."""
         import shutil as _sh
@@ -141,7 +124,7 @@ class StatusScreen:
 
         app = self.app
         rows = [
-            ("Version", f"v{__version__}  ({self._update_status()})"),
+            ("Version", f"v{__version__}"),
             ("Refresh Games List", self._refresh_status()),
             ("OS", str(app.firmware_name)),
             ("ROMs Location", str(app.roms_dir) if app.roms_dir else "n/a"),

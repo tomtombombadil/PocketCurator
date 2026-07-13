@@ -2,6 +2,18 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.31] - 2026-07-13
+
+- Fix: the update dialog claimed you were running the latest version
+  while offering you an update in the same breath. It now only says
+  "latest" about a channel that actually has nothing newer.
+- Fix: the running build's channel is now read from the release itself
+  rather than guessed from version order, which would have mislabelled
+  every pre-release user as being on the stable channel the moment a
+  newer stable release was published.
+- Change: the Status page shows the running version only. Whether an
+  update exists is the Check For Updates screen's job.
+
 ## [1.0.30] - 2026-07-13
 
 - New: fetched games now land in the folder your handheld actually uses

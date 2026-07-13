@@ -94,9 +94,12 @@ class Updater:
         self.prerelease: Optional[dict] = None
         # Which channel the user chose to install from.
         self.channel: str = ""
-        # Newest stable that exists at all - used to tell whether the
-        # running build is itself a pre-release.
+        # Newest stable that exists at all - only a fallback for working
+        # out the running channel.
         self._newest_stable_seen: str = ""
+        # Set from GitHub's own prerelease flag for the release matching
+        # the running version. None = not established yet.
+        self._current_is_prerelease = None
 
         self._asset_url: str = ""
         self._asset_size: int = 0
@@ -170,9 +173,17 @@ class Updater:
         return "Pre-Release" if ch == "prerelease" else "Stable Release"
 
     def running_prerelease(self) -> bool:
-        """True when the build in use is newer than the newest stable -
-        i.e. the user is on the pre-release channel. Only meaningful
-        after a check; before that we can't know, so we say False."""
+        """Is the build in use a pre-release?
+
+        Authoritative answer: the prerelease flag on the GitHub release
+        whose tag matches the running version, recorded during the check.
+        Fallback (build not found in the release list - a local build, or
+        a release too old to appear): compare against the newest stable.
+        That fallback is only a guess, which is why it isn't the primary.
+        """
+        flag = getattr(self, "_current_is_prerelease", None)
+        if flag is not None:
+            return bool(flag)
         s = getattr(self, "_newest_stable_seen", "")
         if not s:
             return False
@@ -266,6 +277,7 @@ class Updater:
             # /releases flagged prerelease.
             self.stable = None
             self.prerelease = None
+            self._current_is_prerelease = None
 
             try:
                 self.stable = self._release_candidate(
@@ -276,9 +288,19 @@ class Updater:
             try:
                 data = self._fetch_json(API_RELEASES)
                 for r in (data if isinstance(data, list) else []):
-                    if r.get("prerelease"):
+                    tag = str(r.get("tag_name", "")).lstrip("vV")
+                    # Which channel is the RUNNING build from? Ask GitHub
+                    # rather than inferring it from version order. The
+                    # comparison "current > newest stable" looks right
+                    # today, but it breaks the moment a stable release
+                    # overtakes an older pre-release: v1.0.29 (a
+                    # pre-release) would be labelled "Stable" as soon as
+                    # v1.1.0 ships. The release's own prerelease flag is
+                    # the fact; the version order is a guess.
+                    if tag == str(self.current_version):
+                        self._current_is_prerelease = bool(r.get("prerelease"))
+                    if r.get("prerelease") and self.prerelease is None:
                         self.prerelease = self._release_candidate(r)
-                        break
             except UpdateError as exc:
                 self._say(f"pre-release check failed: {exc}")
 
