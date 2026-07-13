@@ -11,3 +11,5 @@ Upload Pocket Curator Log.sh
 # Per-launch session logs (timestamped, rotated on-device)
 PC_*.log
 pocketcurator.log
+SendLog*.sh
+upload_log_diag.txt
