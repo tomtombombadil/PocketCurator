@@ -238,9 +238,11 @@ class GameListScreen:
         new_system = self.systems[new_idx]
 
         self.app._show_status(f"Loading {new_system['display']}...")
+        stats: dict = {}
         try:
             games = load_gamelist(new_system["path"],
-                                  rom_extensions=new_system.get("extensions"))
+                                  rom_extensions=new_system.get("extensions"),
+                                  stats_out=stats)
         except Exception as exc:  # noqa
             print(f"[game_list] switch to {new_system['path']} failed: {exc}")
             games = []
@@ -270,6 +272,13 @@ class GameListScreen:
                 self._on_system_changed(new_idx)
             except Exception as exc:
                 print(f"[game_list] on_system_changed callback failed: {exc}")
+
+        # Same drift check as entering from the carousel: if this
+        # system's gamelist lists ROMs the card doesn't have, say so
+        # once. Done last so the notice sits on top of the switched-to
+        # list rather than the one we just left.
+        from .stale_notice import warn_if_stale
+        warn_if_stale(self.app, new_system, stats)
 
     def _page(self, direction: int) -> None:
         """Page down (direction +1) or page up (direction -1).

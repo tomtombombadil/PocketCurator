@@ -83,7 +83,8 @@ class Game:
 
 
 def load_gamelist(system_dir: Path,
-                  rom_extensions: Optional[List[str]] = None) -> List[Game]:
+                  rom_extensions: Optional[List[str]] = None,
+                  stats_out: Optional[dict] = None) -> List[Game]:
     """
     Parse the gamelist.xml in ``system_dir`` and return the games it
     lists, minus any whose ROM file no longer exists on disk.
@@ -125,6 +126,14 @@ def load_gamelist(system_dir: Path,
     existing = _files_in_parents_of(games.values())
     alive = [g for g in games.values() if str(g.rom_path) in existing]
     dropped = len(games) - len(alive)
+    if stats_out is not None:
+        # Report the drift to the caller. An entry with no ROM behind it
+        # means gamelist.xml and the card disagree - EmulationStation
+        # hides such entries but never removes them, so the file only
+        # gets cleaned when ES's own "Clean Gamelist & Remove Unused
+        # Media" is run. We surface it; ES fixes it.
+        stats_out["missing"] = dropped
+        stats_out["total"] = len(games)
     if dropped:
         print(f"[gamelist] dropped {dropped} entries with missing ROM file "
               f"under {system_dir.name}")

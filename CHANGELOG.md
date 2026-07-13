@@ -2,6 +2,16 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.25] - 2026-07-13
+
+- New: when you open a system whose gamelist.xml lists games that aren't
+  on the card, Pocket Curator now tells you, and points you at
+  EmulationStation's "Clean Gamelist & Remove Unused Media" (System >
+  Frontend Developer Options) to tidy it. Pocket Curator prunes entries
+  for ROMs it deletes itself, but pre-existing entries are ES's to
+  clean - so we report the problem rather than editing ES's file
+  behind its back. Shown once per system per session.
+
 ## [1.0.24] - 2026-07-13
 
 - Fix: gamelist.xml entries written by Pocket Curator are now formatted

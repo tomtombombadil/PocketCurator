@@ -101,9 +101,11 @@ class SystemBrowserScreen:
         # rather than freezing in silence. Lightweight overlay keeps
         # the carousel visible underneath.
         self.app._show_status(f"Loading {system['display']}...")
+        stats: dict = {}
         try:
             games = load_gamelist(system["path"],
-                                  rom_extensions=system.get("extensions"))
+                                  rom_extensions=system.get("extensions"),
+                                  stats_out=stats)
         except Exception as exc:  # noqa - never crash on a malformed XML
             print(f"[system_browser] failed to load {system['path']}: {exc}")
             games = []
@@ -124,6 +126,11 @@ class SystemBrowserScreen:
             system_index=self.selected,
             on_system_changed=_sync_selection,
         ))
+        self._warn_if_gamelist_stale(system, stats)
+
+    def _warn_if_gamelist_stale(self, system: dict, stats: dict) -> None:
+        from .stale_notice import warn_if_stale
+        warn_if_stale(self.app, system, stats)
 
     def _begin_delete_system(self) -> None:
         """X on the carousel: delete every game in the highlighted system,
