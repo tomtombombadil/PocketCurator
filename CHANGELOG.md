@@ -2,6 +2,15 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.26] - 2026-07-13
+
+- Fix: the game count on the system selection screen now updates after
+  you delete games or copy new ones in. Previously it kept showing the
+  count from when the app started.
+- Change: the missing-ROMs notice now lists the affected games by name,
+  scrollable with L1/R1, with the instruction to run EmulationStation's
+  "Clean Gamelist & Remove Unused Media" shown below the list.
+
 ## [1.0.25] - 2026-07-13
 
 - New: when you open a system whose gamelist.xml lists games that aren't

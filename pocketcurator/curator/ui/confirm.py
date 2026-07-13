@@ -163,6 +163,16 @@ class ConfirmDeleteScreen:
                       f"deleted): {exc}")
         print(f"[delete] gamelist entries pruned={pruned}")
 
+        # The carousel's count for this system is now out of date (it was
+        # computed at startup). Mark it so the system browser recomputes
+        # it when we return - otherwise you delete 800 games and the
+        # carousel still cheerfully reports the old total.
+        if not dry and deleted_games:
+            try:
+                self.app.dirty_gamelists.add(str(Path(self.system["path"])))
+            except Exception:  # noqa: BLE001
+                pass
+
         # Flag for the launcher's exit-time ES refresh: only when this was
         # a real run that actually removed something.
         if not dry and file_deleted:

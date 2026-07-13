@@ -571,6 +571,11 @@ class RemoteBrowserScreen:
             from ..gamelist_merge import merge_entries
             merge_entries(job.dest_dir, [job.gamelist_entry],
                           overwrite=job.merge_overwrite)
+            # Destination system just gained a game; its carousel count
+            # (fixed at startup) is now stale. Flag it for recount on
+            # the way back. set.add is atomic, so calling this from the
+            # copy worker thread is safe.
+            self.app.dirty_gamelists.add(str(Path(job.dest_dir)))
         except Exception as exc:  # noqa: BLE001 - never break the copy
             print(f"[gamelist-merge] skipped for '{job.title}': {exc}")
 

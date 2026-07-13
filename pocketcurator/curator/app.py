@@ -345,6 +345,13 @@ class App:
         # reads this after run() to decide whether to ask the launcher
         # to refresh EmulationStation so its in-RAM gamelist refreshes.
         self.deletions_occurred = False
+        # Systems whose gamelist.xml we changed this session (deleted a
+        # game, or copied one in). The carousel's game counts are read
+        # at discovery and would otherwise stay frozen at their startup
+        # values - so a system listed here gets its count recomputed
+        # when the user returns to the carousel. Keyed by resolved
+        # system directory path.
+        self.dirty_gamelists: set = set()
         # Set True once any game is copied from a WebDAV source this
         # session. main.py reads it (alongside deletions_occurred) to
         # decide whether the launcher should refresh EmulationStation so

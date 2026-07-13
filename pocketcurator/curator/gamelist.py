@@ -126,6 +126,8 @@ def load_gamelist(system_dir: Path,
     existing = _files_in_parents_of(games.values())
     alive = [g for g in games.values() if str(g.rom_path) in existing]
     dropped = len(games) - len(alive)
+    missing_games = ([g for g in games.values() if str(g.rom_path) not in existing]
+                     if dropped else [])
     if stats_out is not None:
         # Report the drift to the caller. An entry with no ROM behind it
         # means gamelist.xml and the card disagree - EmulationStation
@@ -134,6 +136,10 @@ def load_gamelist(system_dir: Path,
         # Media" is run. We surface it; ES fixes it.
         stats_out["missing"] = dropped
         stats_out["total"] = len(games)
+        # Names for the UI: prefer the gamelist's display name, fall
+        # back to the filename when an entry has no <name>.
+        stats_out["missing_names"] = sorted(
+            (g.name or g.rom_path.name) for g in missing_games)
     if dropped:
         print(f"[gamelist] dropped {dropped} entries with missing ROM file "
               f"under {system_dir.name}")
@@ -142,11 +148,10 @@ def load_gamelist(system_dir: Path,
         # these; a raw entry count does not), so knowing WHICH games are
         # affected is the difference between diagnosing and guessing.
         # Capped so a badly-out-of-sync system can't flood the log.
-        missing = [g for g in games.values() if str(g.rom_path) not in existing]
-        for g in missing[:25]:
+        for g in missing_games[:25]:
             print(f"[gamelist]   no ROM on disk: {g.rom_path}")
-        if len(missing) > 25:
-            print(f"[gamelist]   ... and {len(missing) - 25} more")
+        if len(missing_games) > 25:
+            print(f"[gamelist]   ... and {len(missing_games) - 25} more")
     t_filter = time.monotonic() - t_filter
 
     t_total = time.monotonic() - t_start

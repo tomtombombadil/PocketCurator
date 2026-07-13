@@ -195,7 +195,39 @@ class SystemBrowserScreen:
     # Drawing
     # ------------------------------------------------------------------
 
+    def _refresh_dirty_counts(self) -> None:
+        """Recount any system whose gamelist we changed this session.
+
+        The carousel's counts are computed once, at discovery. Delete 800
+        games and come back, and it would still show the startup number.
+        So the delete and fetch paths flag the systems they touched, and
+        we recount just those, here, on the way back.
+
+        The recount is _count_candidates -> a pure gamelist.xml parse.
+        No filesystem scan: gamelist.xml is the source of truth, and we
+        keep it true by pruning entries when we delete a ROM and merging
+        one when we copy a ROM in. So parsing it is enough.
+        """
+        dirty = getattr(self.app, "dirty_gamelists", None)
+        if not dirty:
+            return
+        from ..firmware import _count_candidates
+        for system in self.systems:
+            path = str(Path(system.get("path", "")))
+            if path not in dirty:
+                continue
+            try:
+                before = system.get("rom_count", 0)
+                system["rom_count"] = _count_candidates(
+                    Path(path), system.get("extensions") or [])
+                print(f"[discover] recount {system.get('shortname')}: "
+                      f"{before} -> {system['rom_count']}")
+            except Exception as exc:  # noqa: BLE001 - a bad count must not crash
+                print(f"[discover] recount failed for {path}: {exc}")
+        dirty.clear()
+
     def draw(self, surface):
+        self._refresh_dirty_counts()
         cfg = self.app.config
         theme = cfg["theme"]
         ui = cfg["ui"]
