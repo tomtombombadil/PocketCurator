@@ -2,6 +2,18 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.35] - 2026-07-14
+
+- Fix: an update could replace the launcher while leaving the app itself
+  on the old version - so the app kept reporting the old version and
+  offering the same update over and over. The update now verifies that
+  the new app actually landed, and refuses to complete if it didn't
+  (retrying on the next launch) instead of reporting success.
+- Fix: on firmwares without a gamelist reload API, Pocket Curator's own
+  description and artwork were never written. They are now written while
+  EmulationStation is stopped, so they're picked up when it comes back.
+- Internal: stale Python bytecode is cleared when an update is applied.
+
 ## [1.0.34] - 2026-07-13
 
 - Change: the quit screen now tells you when Emulation Station is going to

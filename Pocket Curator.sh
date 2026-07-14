@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.34
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.35
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -71,9 +71,42 @@ fail() {
 
 log "applying $(cat "$GAME/.update/READY" 2>/dev/null)"
 
+_pcver() {  # echo the __version__ out of a curator/__init__.py, or "?"
+  grep -m1 '^__version__' "$1" 2>/dev/null | cut -d'"' -f2 || echo "?"
+}
+PC_STAGED_INIT="$STAGED/pocketcurator/curator/__init__.py"
+PC_LIVE_INIT="$GAME/curator/__init__.py"
+log "before: installed=$(_pcver "$PC_LIVE_INIT") staged=$(_pcver "$PC_STAGED_INIT")"
+
+# The staged tree must actually contain a payload. Without this check a
+# missing/incomplete staged tree could sail past the copy below and we'd
+# swap in a new launcher on top of the OLD python package - which is
+# exactly the state seen on Batocera: launcher v1.0.34, app v1.0.18,
+# offering the same update forever because the app never changed.
+[ -f "$PC_STAGED_INIT" ] || fail "staged payload missing ($PC_STAGED_INIT)"
+
 # 1. Payload (everything under pocketcurator/). Runtime files we don't
 #    ship (conf/, logs, flags, settings.json) are untouched by -a copy.
-cp -a "$STAGED/pocketcurator/." "$GAME/" || fail "payload copy"
+cp -a "$STAGED/pocketcurator/." "$GAME/" 2>>"$LOGF" \
+  || cp -rf "$STAGED/pocketcurator/." "$GAME/" 2>>"$LOGF" \
+  || fail "payload copy"
+
+# Drop stale bytecode. The .pyc files left from the OLD version are
+# invalidated by mtime, but a copy that preserves timestamps across a
+# filesystem with coarse mtime granularity can leave a .pyc looking
+# valid for a source it no longer matches. Deleting them costs one
+# recompile and removes the whole class of "new code, old behaviour".
+find "$GAME" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null
+
+# VERIFY the payload landed. cp reporting success is not proof: this
+# apply is the only thing standing between a staged update and a device
+# that silently keeps running the old app forever.
+PC_NOW="$(_pcver "$PC_LIVE_INIT")"
+PC_WANT="$(_pcver "$PC_STAGED_INIT")"
+if [ "$PC_NOW" != "$PC_WANT" ]; then
+  fail "payload verify: installed=$PC_NOW but staged=$PC_WANT (copy did not take)"
+fi
+log "payload OK: app is now v$PC_NOW"
 
 # 2. Scripts in the ports root, each copy-then-rename so the swap of
 #    each file is atomic. (Releases since 0.62.1 ship only the
@@ -708,11 +741,40 @@ _pc_fallback_restart() {
   case "${CFW_NAME,,}" in
     rocknix|jelos|amberelec)
       if command -v systemctl >/dev/null 2>&1; then
-        echo "[Pocket Curator] fallback: systemctl restart ${UI_SERVICE:-emustation}"
-        $ESUDO systemctl restart oga_events 2>/dev/null &
-        $ESUDO systemctl restart "${UI_SERVICE:-emustation}" 2>/dev/null \
-          || $ESUDO systemctl restart emustation 2>/dev/null \
-          || $ESUDO systemctl restart emulationstation 2>/dev/null
+        case "$reason" in
+          metadata|both)
+            # Write our entry while ES is DOWN, then bring it back: ES
+            # re-reads gamelists on startup, so it adopts the write. A
+            # plain restart without the write leaves our description
+            # unwritten forever on firmwares with no reload API - which
+            # is exactly what happened on AmberELEC.
+            echo "[Pocket Curator] fallback: stop -> write metadata -> start"
+            local helper="$GAMEDIR/tools/write_ports_metadata.py"
+            local svc="${UI_SERVICE:-emustation}"
+            local seq='
+              sleep 2
+              $PC_SUDO systemctl stop "$PC_SVC" 2>/dev/null || $PC_SUDO systemctl stop emustation 2>/dev/null || $PC_SUDO systemctl stop emulationstation 2>/dev/null
+              i=0; while [ "$i" -lt 40 ]; do pgrep -f -n emulationstation >/dev/null 2>&1 || break; sleep 0.25; i=$((i+1)); done
+              "$PC_PYBIN" -u "$PC_HELPER" >> "$PC_LOGF" 2>&1
+              $PC_SUDO systemctl start "$PC_SVC" 2>/dev/null || $PC_SUDO systemctl start emustation 2>/dev/null || $PC_SUDO systemctl start emulationstation 2>/dev/null
+            '
+            if command -v setsid >/dev/null 2>&1; then
+              PC_SUDO="$ESUDO" PC_SVC="$svc" PC_PYBIN="$(_pc_syspython)" \
+                PC_HELPER="$helper" PC_LOGF="$PC_LOG" setsid bash -c "$seq" >/dev/null 2>&1 &
+            else
+              PC_SUDO="$ESUDO" PC_SVC="$svc" PC_PYBIN="$(_pc_syspython)" \
+                PC_HELPER="$helper" PC_LOGF="$PC_LOG" bash -c "$seq" >/dev/null 2>&1 &
+              disown 2>/dev/null || true
+            fi
+            ;;
+          *)
+            echo "[Pocket Curator] fallback: systemctl restart ${UI_SERVICE:-emustation}"
+            $ESUDO systemctl restart oga_events 2>/dev/null &
+            $ESUDO systemctl restart "${UI_SERVICE:-emustation}" 2>/dev/null \
+              || $ESUDO systemctl restart emustation 2>/dev/null \
+              || $ESUDO systemctl restart emulationstation 2>/dev/null
+            ;;
+        esac
       fi
       ;;
     knulli|batocera)
