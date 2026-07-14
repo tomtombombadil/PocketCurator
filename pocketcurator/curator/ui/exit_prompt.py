@@ -1,8 +1,12 @@
 """
 Exit prompt - the last thing the user sees before the app quits.
 
-Pocket Curator refreshes EmulationStation automatically on exit when the
-user deleted games, so this screen is just a simple quit confirmation.
+Pocket Curator refreshes EmulationStation automatically on exit - when
+games changed, and when our own Ports entry still needs its description
+and artwork written. That write can only happen once ES is back at its
+menu, so ES visibly reloads its game lists a few seconds AFTER the app
+closes. Unannounced, that reads as "it crashed and took ES with it", so
+this screen says up front that it is coming.
 """
 
 from __future__ import annotations
@@ -62,14 +66,34 @@ class ExitPromptScreen:
                      ((screen_w - hint.get_width()) // 2,
                       surface.get_height() // 2 + hint.get_height()))
 
-        # If they deleted anything this session, reassure them the menu
-        # will update on its own (the launcher reloads ES on exit).
-        if getattr(self.app, "deletions_occurred", False):
-            note_text = "Your Emulation Station gameslist will automatically refresh."
-            note_font = self._fit_font(note_text,
+        # Tell them what will happen AFTER they quit. EmulationStation
+        # visibly reloads its game lists when we write our entry or when
+        # games have changed - and an unannounced reload, right after the
+        # app disappears, reads as "it crashed and took ES with it".
+        # Saying it up front turns a scare into an expectation.
+        meta = bool(getattr(self.app, "metadata_pending", False))
+        changed = (bool(getattr(self.app, "deletions_occurred", False))
+                   or bool(getattr(self.app, "fetches_occurred", False)))
+        notes = []
+        if meta and changed:
+            notes = ["After you exit, Emulation Station will refresh to add",
+                     "Pocket Curator's details and update your games list.",
+                     "This is normal."]
+        elif meta:
+            notes = ["After you exit, Emulation Station will refresh to",
+                     "add Pocket Curator's details. This is normal."]
+        elif changed:
+            notes = ["Your Emulation Station gameslist will",
+                     "automatically refresh after you exit."]
+
+        if notes:
+            note_font = self._fit_font(max(notes, key=len),
                                        max(11, int(ui["font_size_base"] * 0.85)),
                                        max_w)
-            note = note_font.render(note_text, True, tuple(theme["muted_color"]))
-            surface.blit(note,
-                         ((screen_w - note.get_width()) // 2,
-                          surface.get_height() // 2 - title.get_height() * 2 - 8))
+            top = (surface.get_height() // 2 - title.get_height() * 2 - 8
+                   - (len(notes) - 1) * (note_font.get_linesize() + 2))
+            for i, line in enumerate(notes):
+                note = note_font.render(line, True, tuple(theme["muted_color"]))
+                surface.blit(note,
+                             ((screen_w - note.get_width()) // 2,
+                              top + i * (note_font.get_linesize() + 2)))

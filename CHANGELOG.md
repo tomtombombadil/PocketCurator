@@ -2,6 +2,14 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.34] - 2026-07-13
+
+- Change: the quit screen now tells you when Emulation Station is going to
+  refresh after you exit - whether that's to pick up games you changed, or
+  to add Pocket Curator's own details. The refresh happens a few seconds
+  after the app closes, and without warning it looked like something had
+  gone wrong.
+
 ## [1.0.33] - 2026-07-13
 
 - Fix: Pocket Curator's own description and artwork now actually appear in

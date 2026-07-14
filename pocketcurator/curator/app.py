@@ -352,6 +352,22 @@ class App:
         # when the user returns to the carousel. Keyed by resolved
         # system directory path.
         self.dirty_gamelists: set = set()
+
+        # Does our own Ports entry still need its description/artwork
+        # written? Checked once, at startup, so the exit prompt can warn
+        # the user BEFORE they quit: the write happens after Pocket
+        # Curator closes, and EmulationStation visibly reloads its game
+        # lists when it lands. Unannounced, that reload looks like the
+        # app crashed and took ES with it.
+        self.metadata_pending = False
+        try:
+            from .ports_gamelist import entry_needs_metadata
+            self.metadata_pending = entry_needs_metadata(port_dir.parent)
+            if self.metadata_pending:
+                print("[app] our Ports entry needs metadata; ES will refresh "
+                      "after exit")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[app] metadata check failed: {exc}")
         # Edge-detects the copy queue going busy -> idle, so we recount
         # exactly once when a background copy lands.
         self._fetch_was_busy = False
