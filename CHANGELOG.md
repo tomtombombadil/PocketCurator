@@ -2,6 +2,13 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.37] - 2026-07-14
+
+- Internal: releases no longer ship precompiled Python bytecode. It served
+  no purpose (the first launch after an update recompiles regardless) and
+  was the thing that let an update install correctly while the old code
+  kept running.
+
 ## [1.0.36] - 2026-07-14
 
 - Fix: after an update, Pocket Curator could keep running the OLD version
