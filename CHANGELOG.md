@@ -2,6 +2,13 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.39] - 2026-07-14
+
+- The installer now installs the newest release, whether that is a stable
+  release or a pre-release. Installing "the latest stable" could leave a
+  fresh device on a version with no way to reach anything newer. Once
+  installed, you choose your channel from inside the app.
+
 ## [1.0.38] - 2026-07-14
 
 - The one-file installer is now published with every release, so you can
