@@ -39,49 +39,46 @@ def main() -> int:
 
     # --- Pocket Curator's own metadata (description, artwork, ...) ---
     #
-    # PROVEN mechanism (do not "improve" this into a deferred post-exit
-    # write again): write our metadata to disk HERE, while we are still
-    # running, then immediately tell the running EmulationStation to
-    # reload gamelists from disk. ES treats our port as a "game"; when our
-    # window closes it flushes the ports gamelist from its in-RAM model
-    # (bumping playcount/lastplayed), which would clobber a write that
-    # only exists on disk. By reloading NOW, ES pulls our metadata into
-    # its RAM first, so that exit-time flush writes our metadata BACK
-    # instead of overwriting it. A post-exit write/reload (the launcher or
-    # a deferred script) runs AFTER that flush and is too late - that was
-    # the regression that made the description stop updating.
-    wrote_metadata = False        # did we write our metadata to disk?
-    metadata_reloaded = False      # did the running ES adopt it (API)?
+    # We do NOT write it here, and we do NOT reload here. Proven on-device
+    # (RG40xxV, 2026-07-13):
+    #
+    #   ES owns every <game> node it has parsed. Our port IS a game in
+    #   Ports, so when the port exits ES rewrites that node from its
+    #   in-RAM model (bumping playcount/lastplayed) - flattening anything
+    #   we wrote to disk while it was suspended. Calling
+    #   /reloadgames from in here LOOKS like it works (the socket opens,
+    #   so the old code returned True) but ES is suspended behind us and
+    #   never applies it before that flush. Result: the app wrote the
+    #   correct description on all 80 launches and not one of them stuck -
+    #   the file still held a sentinel string a probe script left behind
+    #   years ago, because THAT one was written while ES was idle.
+    #
+    #   Writing while ES sits idle at its menu, then asking it to reload,
+    #   IS adopted and IS durable (confirmed by hand on the device).
+    #
+    # So: just tell the launcher that our entry needs writing. It runs
+    # tools/write_ports_metadata.py in a detached process AFTER ES has
+    # come back and done its flush - the one moment the write survives.
+    needs_metadata = False
     try:
-        from curator.ports_gamelist import entry_needs_metadata, ensure_entry
-        if entry_needs_metadata(here.parent):
-            ensure_entry(ports_dir=here.parent)
-            wrote_metadata = True
-            # The in-app reload is what makes the write stick (see above).
-            # API firmwares (Batocera/ROCKNIX/Knulli) -> True, done.
-            # ArkOS-family (dArkOS) has no API -> False, so the launcher's
-            # on-exit ArkOS ES-restart path must register it instead.
-            metadata_reloaded = _reload_running_es()
+        from curator.ports_gamelist import entry_needs_metadata
+        needs_metadata = entry_needs_metadata(here.parent)
     except Exception:
         pass
 
     # Tell the launcher what to do on exit:
-    #   metadata / both -> we wrote our metadata but couldn't reload it
-    #       in-app (no API, i.e. dArkOS). The launcher's metadata path
-    #       does a stop -> write-while-ES-is-DOWN -> start. Writing while
-    #       ES is stopped is the ONLY thing that sticks on dArkOS: at idle
-    #       the write survives, but ES's game-exit flush (RAM -> disk)
-    #       clobbers a write made while ES is up. Proven on-device with
-    #       the down-window probe. 'both' when there are also ROM changes.
-    #   deletions -> only ROM changes to surface (our metadata is already
-    #       safe in ES's RAM via the in-app reload, or nothing to write).
+    #   metadata / both -> write our entry once ES is idle again, then
+    #       reload. 'both' when there are also ROM changes to surface.
+    #   deletions -> ROM changes only. A plain reload handles those: ES
+    #       re-scans for added/removed games, which is disk->RAM and
+    #       cannot be clobbered. (This is why fetch and delete have always
+    #       worked while our own metadata never did - different code path
+    #       inside ES entirely.)
     try:
         changed = (bool(getattr(app, "deletions_occurred", False))
                    or bool(getattr(app, "fetches_occurred", False)))
         reason = ""
-        if wrote_metadata and not metadata_reloaded:
-            # Down-window rewrite needed (dArkOS). 'both' also refreshes
-            # for this session's deletions/fetches in the same restart.
+        if needs_metadata:
             reason = "both" if changed else "metadata"
         elif changed:
             reason = "deletions"
@@ -91,21 +88,6 @@ def main() -> int:
         pass
 
     return rc
-
-
-def _reload_running_es(timeout: float = 8.0) -> bool:
-    """Ask the running EmulationStation to reload gamelists from disk
-    (no restart). Best-effort; returns True on success. This is the local
-    ES HTTP API that Batocera/ROCKNIX/Knulli expose (the same one
-    PortMaster uses). Firmwares without it (e.g. dArkOS) simply get False
-    and fall back to the launcher's on-exit refresh."""
-    import urllib.request
-    try:
-        with urllib.request.urlopen(
-                "http://localhost:1234/reloadgames", timeout=timeout):
-            return True
-    except Exception:
-        return False
 
 
 if __name__ == "__main__":

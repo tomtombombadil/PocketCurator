@@ -2,6 +2,15 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.33] - 2026-07-13
+
+- Fix: Pocket Curator's own description and artwork now actually appear in
+  EmulationStation. They were being written on every launch and discarded
+  every time: EmulationStation owns the entry for a port while that port
+  is running, and rewrites it from memory the moment the port exits. The
+  entry is now written once EmulationStation is back at its menu, which is
+  the only moment the write survives.
+
 ## [1.0.32] - 2026-07-13
 
 - Change: the on-screen keyboard now wraps around. Moving left from the

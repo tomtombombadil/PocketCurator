@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.32
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.33
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -639,6 +639,65 @@ _pc_reload_via_api() {
   curl -s -m 8 http://localhost:1234/reloadgames >/dev/null 2>&1
 }
 
+_pc_metadata_after_es_settles() {
+  # Write OUR ports entry once EmulationStation is idle again, then ask it
+  # to reload. This timing is the whole trick, and it is the ONLY timing
+  # that works (proven on-device, RG40xxV):
+  #
+  #   ES owns the <game> node for our port. When the port exits, ES
+  #   rewrites that node from its in-RAM model (playcount/lastplayed) -
+  #   flattening anything written while it was suspended. So a write from
+  #   inside the app, or from here before ES has flushed, is thrown away.
+  #   A /reloadgames call from inside the port doesn't help either: the
+  #   socket opens, so it looks like it worked, but ES is suspended and
+  #   never applies the reload before its own flush lands on top.
+  #
+  #   Once ES is back at its menu, a write + reload IS adopted and IS
+  #   durable. (A probe script's sentinel string, written at idle years
+  #   ago, survived 80 launches of the app trying to replace it.)
+  #
+  # So: detach, wait for ES's flush to land (watch the gamelist's mtime),
+  # give it a beat to settle, write, reload. Detached via setsid because
+  # PortMaster's cleanup tears down our process group on the way out.
+  # System python only - $PYTHON_BIN is the bundled runtime and is already
+  # unmounted by now. (That is almost certainly why the last attempt at a
+  # deferred write "didn't work" and got blamed on timing: it silently ran
+  # nothing at all.)
+  local helper="$GAMEDIR/tools/write_ports_metadata.py"
+  local pybin; pybin="$(_pc_syspython)" || { echo "[Pocket Curator] no system python; skipping metadata write"; return; }
+  [ -f "$helper" ] || { echo "[Pocket Curator] $helper missing; skipping metadata write"; return; }
+  local ports_dir; ports_dir="$(dirname "$GAMEDIR")"
+  local gl="$ports_dir/gamelist.xml"
+
+  local seq='
+    before=$(stat -c %Y "$PC_GL" 2>/dev/null || echo 0)
+    i=0
+    while [ "$i" -lt 60 ]; do
+      now=$(stat -c %Y "$PC_GL" 2>/dev/null || echo 0)
+      [ "$now" != "$before" ] && break      # ES has flushed; it is back
+      sleep 0.5
+      i=$((i+1))
+    done
+    sleep 2                                  # let ES settle at its menu
+    echo "[metadata] ES settled; writing our entry" >> "$PC_LOGF" 2>&1
+    "$PC_PYBIN" -u "$PC_HELPER" >> "$PC_LOGF" 2>&1
+    if command -v curl >/dev/null 2>&1; then
+      curl -s -m 8 http://localhost:1234/reloadgames >/dev/null 2>&1 \
+        && echo "[metadata] reloaded ES (adopted)" >> "$PC_LOGF" 2>&1 \
+        || echo "[metadata] reload API unavailable" >> "$PC_LOGF" 2>&1
+    fi
+  '
+  echo "[Pocket Curator] scheduling metadata write for when ES is idle"
+  if command -v setsid >/dev/null 2>&1; then
+    PC_GL="$gl" PC_PYBIN="$pybin" PC_HELPER="$helper" PC_LOGF="$PC_LOG" \
+      setsid bash -c "$seq" >/dev/null 2>&1 &
+  else
+    PC_GL="$gl" PC_PYBIN="$pybin" PC_HELPER="$helper" PC_LOGF="$PC_LOG" \
+      bash -c "$seq" >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+  fi
+}
+
 _pc_fallback_restart() {
   # No reload API reachable. Restart ES per firmware so at least
   # deletions are picked up. $1 is the refresh reason; when it includes
@@ -902,6 +961,14 @@ if [ -f "$GAMEDIR/.es_refresh_needed" ]; then
       # Message only when we actually fall back to a restart.
       if _pc_reload_via_api; then
         echo "[Pocket Curator] refreshed EmulationStation in place (reloadgames API)"
+        # A reload picks up ADDED/REMOVED games (disk->RAM, nothing to
+        # clobber) - that's why deletions and fetches have always worked.
+        # It does NOT rescue our own <game> entry: ES still holds that
+        # node in RAM and flushes it back over us on the way out. That
+        # write has to happen after ES is idle again, so schedule it.
+        case "$refresh_reason" in
+          metadata|both) _pc_metadata_after_es_settles ;;
+        esac
       else
         echo "[Pocket Curator] reloadgames API unavailable; using restart fallback"
         pm_message "$refresh_msg"
