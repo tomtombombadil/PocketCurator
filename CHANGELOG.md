@@ -2,6 +2,18 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.40] - 2026-07-14
+
+- New: Menu + X takes a screenshot of whatever is on screen, saved to
+  pocketcurator/screenshots/. Menu on its own still opens Settings.
+- Fix: a game marked for deletion now shows a RED X, not a grey one. Grey
+  is the colour of "inactive", which is the opposite of what that mark
+  means.
+- Change: marked games are dimmed in the list, so a glance separates what
+  is going from what is staying.
+- Change: on the fetch screen, games already on your device (the yellow ?)
+  are dimmed too, separating them from the new games you're about to copy.
+
 ## [1.0.39] - 2026-07-14
 
 - The installer now installs the newest release, whether that is a stable

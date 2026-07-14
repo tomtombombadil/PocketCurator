@@ -1027,11 +1027,19 @@ class RemoteBrowserScreen:
             exists = i in self.flagged_existing
             if i == self.selected:
                 pygame.draw.rect(surface, hi, row)
-            # Marked rows keep normal text color; an inverted chip
-            # carries the signal so it stays legible under any font or
-            # highlight color: black + on a green chip for new games,
-            # black ? on a yellow chip for games already on the device.
+            # Marked rows carry an inverted chip so the signal survives
+            # any font or highlight colour: black + on green for a game
+            # that's coming over, black ? on yellow for one that's
+            # already on the device.
+            #
+            # Games already on the device are also DIMMED, so a glance
+            # down the list separates "new" from "already have it"
+            # without reading a glyph. The highlighted row keeps its
+            # normal colour - dimming the row under the cursor just makes
+            # it hard to read.
             fg = hi_text if i == self.selected else text_c
+            if flagged and exists and i != self.selected:
+                fg = muted
             x = row.x + 8
             if e.is_dir:
                 x += self._draw_folder_icon(surface, x, row, fg) + 8

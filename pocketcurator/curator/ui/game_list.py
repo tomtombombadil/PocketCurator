@@ -20,6 +20,13 @@ from typing import Callable, List, Optional, Set
 import pygame
 
 from ..gamelist import Game
+
+# Marker chip colours. The fetch screen uses the same language - a bright
+# chip with a black glyph - so the three marks read as one family:
+#   red X      -> this game is going to be deleted
+#   green +    -> this game will be copied over
+#   yellow ?   -> marked, but already on the device
+DELETE_RED = (232, 62, 62)
 from ..render import (
     draw_stars,
     draw_wrapped_text,
@@ -497,26 +504,29 @@ class GameListScreen:
                         x_off = 0
                         self._marquee_anchor_ms = now
 
-            # Flag indicator: a red X drawn as two lines, left of the
-            # game name. Oxanium doesn't have a ballot-X glyph (U+2717)
-            # in its char map, and the user wanted X specifically, not
-            # a bullet. Drawing as a shape is reliable.
+            # Flag indicator: a black X on a RED chip, left of the game
+            # name - the same language as the fetch screen's black + on
+            # green and black ? on yellow. Black-on-bright stays legible
+            # whatever font and highlight colours the user picks.
             #
-            # Colour switches to white when the row is selected because
-            # red-on-red highlight is invisible. Stroke is generous so
-            # the mark is legible on small handheld screens.
+            # (This had drifted to a black X on a light-GREY chip, which
+            # said nothing: grey is the colour of "inactive", and this is
+            # the most destructive mark in the app.)
+            #
+            # The name itself is dimmed once marked, so a glance down the
+            # list separates "going" from "staying" without reading a
+            # single glyph. The highlighted row keeps its normal colour -
+            # dimming the row under the cursor just makes it hard to read.
             display_name = game.name
             x_pad_left = 0
             if is_flag:
+                if not is_sel:
+                    text_color = tuple(theme["muted_color"])
                 x_size = max(12, int(font.get_height() * 0.66))
                 x_pad_left = x_size + 10  # space taken by chip + gap
                 chip = pygame.Rect(rect.x + pad_x, y + (line_h - x_size) // 2,
                                    x_size, x_size)
-                # Black X on a light-grey chip - the inverse of the green
-                # plus / yellow question on the fetch screen, and legible
-                # over any highlight or font color.
-                pygame.draw.rect(surface, (210, 210, 210), chip,
-                                 border_radius=3)
+                pygame.draw.rect(surface, DELETE_RED, chip, border_radius=3)
                 cx, cy = chip.centerx, chip.centery
                 half = int(x_size * 0.28)
                 stroke = max(2, x_size // 6)
