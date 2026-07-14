@@ -11,10 +11,31 @@
 # It always installs the LATEST release, so this file never goes stale.
 # Re-running it later reinstalls/repairs (your settings are preserved).
 # After a successful install you can delete it, or keep it around.
+#
+# STABLE or PRE-RELEASE
+# ---------------------
+# By default this installs the latest STABLE release - the right choice for
+# almost everyone.
+#
+# To install the latest PRE-RELEASE instead (newer features, less tested),
+# do ONE of these before launching it:
+#
+#   * rename this file so the name contains "prerelease", e.g.
+#         PocketCurator.Installer.prerelease.sh
+#   * or create an empty file called  PRERELEASE  next to it in ports/
+#
+# A script launched from EmulationStation has no way to ask you a question -
+# there is no keyboard and no terminal - so the choice has to be made before
+# it starts. Whichever channel it picks, it says so on screen.
+#
+# Once Pocket Curator is installed you can switch channels at any time from
+# inside the app: Settings > Check For Updates offers both, A for stable and
+# Y for pre-release.
 # ===========================================================================
 
 REPO="tomtombombadil/PocketCurator"
 API_LATEST="https://api.github.com/repos/$REPO/releases/latest"
+API_ALL="https://api.github.com/repos/$REPO/releases?per_page=30"
 
 # Self-heal Windows line endings if they snuck in.
 if LC_ALL=C grep -q $'\r' "$0" 2>/dev/null; then
@@ -84,7 +105,28 @@ die() {
   exit 1
 }
 
-say "installer starting on $CFW_NAME"
+# ---- which channel? -------------------------------------------------------
+# No input is possible from an ES-launched script, so the choice is made by
+# how the file is named, or by a marker file, or by an env var - checked in
+# that order. Default: stable.
+PC_CHANNEL="${PC_CHANNEL:-}"
+if [ -z "$PC_CHANNEL" ]; then
+  case "$(basename "$0" | tr '[:upper:]' '[:lower:]')" in
+    *prerelease*|*pre-release*|*beta*) PC_CHANNEL="prerelease" ;;
+  esac
+fi
+if [ -z "$PC_CHANNEL" ] && [ -e "$SCRIPT_DIR/PRERELEASE" ]; then
+  PC_CHANNEL="prerelease"
+fi
+[ "$PC_CHANNEL" = "prerelease" ] || PC_CHANNEL="stable"
+
+if [ "$PC_CHANNEL" = "prerelease" ]; then
+  CHANNEL_LABEL="Pre-Release"
+else
+  CHANNEL_LABEL="Stable Release"
+fi
+
+say "installer starting on $CFW_NAME ($CHANNEL_LABEL channel)"
 
 # ---- preflight ------------------------------------------------------------
 command -v curl  >/dev/null 2>&1 || die "curl not found on this firmware."
@@ -104,10 +146,43 @@ if [ -n "$free_kb" ] && [ "$free_kb" -lt 61440 ]; then
 fi
 
 # ---- find the latest release ----------------------------------------------
-say "looking up the latest release..."
-api_json="$(curl -sfL --connect-timeout 10 -m 20 \
-              -H 'Accept: application/vnd.github+json' "$API_LATEST")" \
-  || die "can't reach GitHub. Is WiFi connected?"
+say "looking up the latest $CHANNEL_LABEL..."
+
+if [ "$PC_CHANNEL" = "prerelease" ]; then
+  # /releases lists newest first, pre-releases included. Pull out the first
+  # entry flagged prerelease and work only with that entry, so the zip URL
+  # we pick can't accidentally come from a different release.
+  all_json="$(curl -sfL --connect-timeout 10 -m 25 \
+                -H 'Accept: application/vnd.github+json' "$API_ALL")" \
+    || die "can't reach GitHub. Is WiFi connected?"
+  if command -v python3 >/dev/null 2>&1; then
+    api_json="$(printf '%s' "$all_json" | python3 -c "
+import json, sys
+try:
+    for r in json.load(sys.stdin):
+        if r.get('prerelease'):
+            print(json.dumps(r))
+            break
+except Exception:
+    pass
+" 2>/dev/null)"
+  else
+    # Every firmware Pocket Curator supports ships python3 (the app needs
+    # it), so this shouldn't happen. Fail honestly rather than guess at
+    # the JSON with grep and risk installing the wrong release.
+    say "python3 not found - can't safely pick a pre-release."
+    say "installing the latest Stable Release instead."
+    PC_CHANNEL="stable"
+    CHANNEL_LABEL="Stable Release"
+    api_json="$(curl -sfL --connect-timeout 10 -m 20 \
+                  -H 'Accept: application/vnd.github+json' "$API_LATEST")" \
+      || die "can't reach GitHub. Is WiFi connected?"
+  fi
+else
+  api_json="$(curl -sfL --connect-timeout 10 -m 20 \
+                -H 'Accept: application/vnd.github+json' "$API_LATEST")" \
+    || die "can't reach GitHub. Is WiFi connected?"
+fi
 
 tag="$(echo "$api_json" | grep -o '"tag_name"[^,]*' | head -1 \
         | sed -E 's/.*"(v[0-9.]+)".*/\1/')"
@@ -115,9 +190,28 @@ zip_url="$(echo "$api_json" | grep -o '"browser_download_url"[^"]*"[^"]*pocketcu
         | head -1 | sed -E 's/.*"(https[^"]+)"/\1/')"
 sha_url="$(echo "$api_json" | grep -o '"browser_download_url"[^"]*"[^"]*pocketcurator_port-v[0-9.]*\.zip\.sha256"' \
         | head -1 | sed -E 's/.*"(https[^"]+)"/\1/')"
+
+# If the requested channel has nothing usable, fall back to the other one
+# rather than dying - a device with no Pocket Curator at all is worse than
+# one on the wrong channel, and we tell the user which they got.
+if [ -z "$tag" ] || [ -z "$zip_url" ]; then
+  if [ "$PC_CHANNEL" = "prerelease" ]; then
+    say "no pre-release found - falling back to the latest Stable Release."
+    CHANNEL_LABEL="Stable Release"
+    api_json="$(curl -sfL --connect-timeout 10 -m 20 \
+                  -H 'Accept: application/vnd.github+json' "$API_LATEST")" \
+      || die "can't reach GitHub. Is WiFi connected?"
+    tag="$(echo "$api_json" | grep -o '"tag_name"[^,]*' | head -1 \
+            | sed -E 's/.*"(v[0-9.]+)".*/\1/')"
+    zip_url="$(echo "$api_json" | grep -o '"browser_download_url"[^"]*"[^"]*pocketcurator_port-v[0-9.]*\.zip"' \
+            | head -1 | sed -E 's/.*"(https[^"]+)"/\1/')"
+    sha_url="$(echo "$api_json" | grep -o '"browser_download_url"[^"]*"[^"]*pocketcurator_port-v[0-9.]*\.zip\.sha256"' \
+            | head -1 | sed -E 's/.*"(https[^"]+)"/\1/')"
+  fi
+fi
 [ -n "$tag" ] && [ -n "$zip_url" ] || die "couldn't find a release zip on GitHub."
 
-say "found $tag - downloading (about 5 MB)..."
+say "found $CHANNEL_LABEL $tag - downloading (about 5 MB)..."
 
 # ---- download + verify -----------------------------------------------------
 rm -f "$WORK_ZIP"
@@ -136,7 +230,7 @@ fi
 unzip -tqq "$WORK_ZIP" >/dev/null 2>&1 || die "downloaded zip is corrupt. Try again."
 
 # ---- install ----------------------------------------------------------------
-say "installing $tag..."
+say "installing $CHANNEL_LABEL $tag..."
 if [ -f "$GAMEDIR/settings.json" ]; then
   # Reinstall/repair: never clobber the user's settings.
   unzip -oqq "$WORK_ZIP" -x "pocketcurator/settings.json" -d "$PORTS_DIR" \
@@ -177,8 +271,8 @@ fi
 if [ -d "$GAMEDIR" ]; then
   mv -f "$LOGF" "$GAMEDIR/install.log" 2>/dev/null && LOGF="$GAMEDIR/install.log"
 fi
-say "done! Pocket Curator $tag will appear in Ports momentarily."
-pm_message "Pocket Curator $tag installed! You can delete the installer, or keep it for repairs."
+say "done! Pocket Curator $tag ($CHANNEL_LABEL) will appear in Ports momentarily."
+pm_message "Pocket Curator $tag ($CHANNEL_LABEL) installed! You can delete the installer, or keep it for repairs."
 sleep 6
 exit 0
 

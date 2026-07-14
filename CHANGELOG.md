@@ -2,6 +2,15 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.38] - 2026-07-14
+
+- The one-file installer is now published with every release, so you can
+  always grab it from the release page.
+- The installer can install either channel. It installs the latest Stable
+  Release by default; to install the latest Pre-Release instead, rename it
+  so the name contains "prerelease", or drop an empty file called
+  PRERELEASE beside it. It tells you which one it's installing.
+
 ## [1.0.37] - 2026-07-14
 
 - Internal: releases no longer ship precompiled Python bytecode. It served
