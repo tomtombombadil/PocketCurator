@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.35
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.36
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -243,6 +243,14 @@ fi
 
 APP_VERSION=$(grep '^__version__' "$GAMEDIR/curator/__init__.py" | sed -E 's/.*"([^"]+)".*/\1/')
 APP_BUILD=$(grep '^__build__'   "$GAMEDIR/curator/__init__.py" | sed -E 's/.*"([^"]+)".*/\1/')
+
+# The version as it exists ON DISK. The app reports the version it
+# actually IMPORTED. If those two disagree, python is running stale
+# bytecode from __pycache__ against new sources - which is precisely how
+# a Batocera device ended up with launcher v1.0.34 executing app v1.0.18,
+# reporting the old version and offering the same update forever. Export
+# it so the app can catch that itself instead of us squinting at logs.
+export PC_DISK_VERSION="$APP_VERSION"
 
 echo "=========================================="
 echo "  Pocket Curator v${APP_VERSION} (build ${APP_BUILD})"

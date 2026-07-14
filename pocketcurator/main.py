@@ -28,10 +28,55 @@ def _ensure_path():
         sys.path.insert(0, str(port_dir))
 
 
+def _check_stale_bytecode(here: Path) -> None:
+    """Catch python running OLD code against NEW source files.
+
+    The launcher reads __version__ straight out of curator/__init__.py on
+    disk and passes it in. We compare it against the version we actually
+    IMPORTED. They can only differ if python loaded stale .pyc files from
+    __pycache__ - new sources, old behaviour.
+
+    This is not hypothetical: a Batocera device ran launcher v1.0.34 on
+    top of app v1.0.18 for exactly this reason. The app kept reporting the
+    old version, so it kept offering the same update, applying it, and
+    "succeeding" - forever. Nothing in the code noticed, because nothing
+    was comparing the two.
+
+    So: notice, say so loudly, and fix it - delete the stale bytecode so
+    the next launch compiles the real sources. Self-healing beats a
+    diagnostic nobody reads.
+    """
+    import os
+    import shutil
+    from curator import __version__ as imported
+
+    on_disk = os.environ.get("PC_DISK_VERSION", "").strip()
+    if not on_disk or on_disk == imported:
+        return
+
+    print(f"[app] *** STALE BYTECODE: disk has v{on_disk} but python "
+          f"imported v{imported} ***")
+    print("[app] clearing __pycache__ so the next launch runs the real code")
+    removed = 0
+    for root, dirs, _ in os.walk(here):
+        for d in list(dirs):
+            if d == "__pycache__":
+                shutil.rmtree(Path(root) / d, ignore_errors=True)
+                dirs.remove(d)
+                removed += 1
+    print(f"[app] removed {removed} __pycache__ director"
+          f"{'y' if removed == 1 else 'ies'}; relaunch to complete the update")
+
+
 def main() -> int:
     _ensure_path()
 
     here = Path(__file__).resolve().parent
+
+    try:
+        _check_stale_bytecode(here)
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must never crash us
+        print(f"[app] bytecode check failed: {exc}")
 
     from curator.app import App
     app = App(port_dir=here)

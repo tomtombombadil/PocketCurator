@@ -2,6 +2,14 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.0.36] - 2026-07-14
+
+- Fix: after an update, Pocket Curator could keep running the OLD version
+  even though the new files were installed - so it reported the old
+  version and offered the same update again and again. It now notices
+  when this has happened, clears the stale data itself, and comes up on
+  the correct version the next time you launch it.
+
 ## [1.0.35] - 2026-07-14
 
 - Fix: an update could replace the launcher while leaving the app itself
