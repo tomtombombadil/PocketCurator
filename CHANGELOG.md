@@ -2,6 +2,17 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.1.0] - 2026-07-15
+
+First stable release since 1.0.0. It rolls up the 1.0.x line and refreshes
+the artwork.
+
+- Refreshed the splash screen, the systems and games-list screenshots, and
+  the preview video shown on Pocket Curator's own Ports entry.
+- A game marked for deletion - and, on the fetch screen, a game already on
+  your device - now stays dimmed even under the selection cursor, so the
+  mark reads the same whether or not the row is highlighted.
+
 ## [1.0.40] - 2026-07-14
 
 - New: Menu + X takes a screenshot of whatever is on screen, saved to

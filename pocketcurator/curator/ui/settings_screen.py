@@ -442,6 +442,6 @@ def _open_restore(app):
                 (f"{b['shortname']}'s gamelist.xml was restored from "
                  f"the {b['stamp']} backup."
                  if ok else
-                 "Couldn't write the gamelist. Check the newest PC_*.log.")))
+                 "Couldn't write the gamelist. Check the newest log in pocketcurator/logs/.")))
 
     app.push_screen(_RestoreScreen(app))

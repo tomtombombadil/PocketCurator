@@ -195,7 +195,7 @@ class ConfirmDeleteScreen:
                        f"game{'s' if total_games != 1 else ''} "
                        f"({file_deleted} files).\n"
                        f"{len(failed_games)} could NOT be removed - see the "
-                       f"newest PC_*.log.")
+                       f"newest log in pocketcurator/logs/.")
         else:
             extra = f" ({file_skipped} already gone)" if file_skipped else ""
             summary = (f"Removed {len(deleted_games)} game"

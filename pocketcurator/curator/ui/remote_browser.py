@@ -1034,12 +1034,10 @@ class RemoteBrowserScreen:
             #
             # Games already on the device are also DIMMED, so a glance
             # down the list separates "new" from "already have it"
-            # without reading a glyph. The highlighted row keeps its
-            # normal colour - dimming the row under the cursor just makes
-            # it hard to read.
+            # without reading a glyph - including under the selection bar.
             fg = hi_text if i == self.selected else text_c
-            if flagged and exists and i != self.selected:
-                fg = muted
+            if flagged and exists:
+                fg = muted          # muted even under the selection bar
             x = row.x + 8
             if e.is_dir:
                 x += self._draw_folder_icon(surface, x, row, fg) + 8

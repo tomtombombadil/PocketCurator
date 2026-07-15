@@ -162,6 +162,7 @@ class App:
             7: pygame.K_TAB,      # Start
             9: pygame.K_LEFTBRACKET,   # L2 (digital, where present)
             10: pygame.K_RIGHTBRACKET, # R2
+            8: pygame.K_F9,       # L3 (left stick click)
         }
         self._js_hat_keys = {
             (0, 1): pygame.K_UP, (0, -1): pygame.K_DOWN,
@@ -180,6 +181,7 @@ class App:
             getattr(_pc, "CONTROLLER_BUTTON_RIGHTSHOULDER", 10): pygame.K_PAGEDOWN,
             getattr(_pc, "CONTROLLER_BUTTON_BACK", 4): pygame.K_F1,    # Select
             getattr(_pc, "CONTROLLER_BUTTON_START", 6): pygame.K_TAB,
+            getattr(_pc, "CONTROLLER_BUTTON_LEFTSTICK", 7): pygame.K_F9,
             getattr(_pc, "CONTROLLER_BUTTON_DPAD_UP", 11): pygame.K_UP,
             getattr(_pc, "CONTROLLER_BUTTON_DPAD_DOWN", 12): pygame.K_DOWN,
             getattr(_pc, "CONTROLLER_BUTTON_DPAD_LEFT", 13): pygame.K_LEFT,
@@ -371,11 +373,6 @@ class App:
         # Edge-detects the copy queue going busy -> idle, so we recount
         # exactly once when a background copy lands.
         self._fetch_was_busy = False
-        # Menu (Select) is a modifier when held: Menu + X = screenshot.
-        # _menu_used records that the hold was consumed by a combo, so
-        # releasing it doesn't also open Settings.
-        self._menu_held = False
-        self._menu_used = False
         # Set True once any game is copied from a WebDAV source this
         # session. main.py reads it (alongside deletions_occurred) to
         # decide whether the launcher should refresh EmulationStation so
@@ -422,22 +419,23 @@ class App:
         self._refresh_carousel_if_top()
 
     def _save_screenshot(self) -> None:
-        """Menu + X: save exactly what's on screen as a PNG.
+        """Save exactly what is on screen (L3).
 
         pygame already holds the finished frame, so this is pixel-perfect
-        at the device's real resolution - and it works identically on
-        wayland, kmsdrm and x11. Capturing /dev/fb0 over SSH does not:
-        under a Wayland compositor fb0 often isn't the surface being
-        displayed at all, so you get a black or stale frame, and you're
-        left guessing at byte order to convert it.
+        at the device's real resolution, and identical on wayland, kmsdrm
+        and x11. Reading /dev/fb0 over SSH is not: under a Wayland
+        compositor fb0 often isn't the surface being displayed, so you get
+        a black or stale frame and then have to guess the byte order.
 
-        Saved to pocketcurator/screenshots/, which is reachable over the
-        device's Samba share - no SSH, no conversion step.
+        The screenshots/ folder is created ON DEMAND - only once someone
+        actually takes a shot - so a normal install never grows a folder
+        it has no use for.
         """
         try:
             import time
             shots = Path(self.port_dir) / "screenshots"
-            shots.mkdir(parents=True, exist_ok=True)
+            shots.mkdir(parents=True, exist_ok=True)   # created on first use only
+
             screen = ""
             if self._screens:
                 screen = type(self._screens[-1]).__name__
@@ -448,11 +446,29 @@ class App:
                     ("-" + c.lower()) if c.isupper() else c for c in screen
                 ).lstrip("-")
             stamp = time.strftime("%Y-%m-%d_%H%M%S")
-            name = f"PC_{screen}_{stamp}.png" if screen else f"PC_{stamp}.png"
-            path = shots / name
-            pygame.image.save(self.surface, str(path))
+            # Date first, no prefix - screenshots sort in capture order,
+            # and the screens/ folder already identifies what they are.
+            base = f"{stamp}_{screen}" if screen else f"{stamp}"
+
+            # JPEG. libjpeg ships inside the bundled runtime
+            # (libs.aarch64/pygame.libs/libjpeg-*.so), so this works there.
+            # NOTE: pygame.image.save takes no quality argument - the
+            # signature is save(Surface, filename) - so JPEG quality is
+            # whatever SDL_image defaults to (~85). It is not settable
+            # without pulling in PIL, which we do not bundle.
+            # bundled path; on firmwares that use the SYSTEM pygame the
+            # build might lack JPEG support, so fall back to PNG rather
+            # than silently save nothing.
+            path = shots / f"{base}.jpg"
+            try:
+                pygame.image.save(self.surface, str(path), "JPEG")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[screenshot] jpeg unavailable ({exc}); saving png")
+                path = shots / f"{base}.png"
+                pygame.image.save(self.surface, str(path))
+
             print(f"[screenshot] saved {path}")
-            self._show_status(f"Screenshot: {name}")
+            self._show_status("Screenshot Saved")
         except Exception as exc:  # noqa: BLE001 - never crash over a screenshot
             print(f"[screenshot] failed: {exc}")
             self._show_status("Screenshot failed")
@@ -840,35 +856,12 @@ class App:
                 else:
                     self._is_repeat_event = False
 
-                # --- Menu (Select) combos -----------------------------
-                #
-                # Menu + X takes a screenshot of whatever is on screen.
-                #
-                # Menu on its own still opens Settings, but it now fires
-                # on RELEASE rather than press. It has to: Settings used
-                # to open the instant Menu went down, so by the time the
-                # user pressed X the Settings screen was already on top -
-                # and we'd have photographed that instead of the screen
-                # they wanted. Deferring to release costs nothing the
-                # user can perceive and makes the combo possible at all.
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
-                    self._menu_held = True
-                    self._menu_used = False
-                    continue
-                if event.type == pygame.KEYUP and event.key == pygame.K_F1:
-                    fire_menu = self._menu_held and not self._menu_used
-                    self._menu_held = False
-                    self._menu_used = False
-                    if fire_menu and self._screens:
-                        self._screens[-1].handle_event(
-                            pygame.event.Event(pygame.KEYDOWN,
-                                               key=pygame.K_F1))
-                    continue
-                if (event.type == pygame.KEYDOWN
-                        and event.key == pygame.K_x
-                        and self._menu_held):
-                    self._menu_used = True      # Menu was a modifier, not Settings
-                    self._save_screenshot()
+                # L3 -> save a screenshot of the current screen. Handled
+                # here, before any screen sees it, so it works on every
+                # screen and can never collide with a screen's own keys.
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_F9:
+                    if not self._is_repeat_event:
+                        self._save_screenshot()
                     continue
 
                 # Translate gamepad input into key events on drivers
@@ -889,6 +882,16 @@ class App:
                             self._is_repeat_event = False
                             self._held_keys.discard(synth.key)
                             self._swallowed_keys.discard(synth.key)
+                        # L3 screenshot also arrives here on the joystick
+                        # path (kmsdrm), where the button is translated to a
+                        # synthetic F9. Intercept it centrally exactly like
+                        # the keyboard path above, before the screen - which
+                        # doesn't handle F9 - would swallow it and drop it.
+                        if (synth.type == pygame.KEYDOWN
+                                and synth.key == pygame.K_F9):
+                            if not self._is_repeat_event:
+                                self._save_screenshot()
+                            continue
                         self._screens[-1].handle_event(synth)
                         if self._quit:
                             break

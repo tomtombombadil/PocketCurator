@@ -515,13 +515,14 @@ class GameListScreen:
             #
             # The name itself is dimmed once marked, so a glance down the
             # list separates "going" from "staying" without reading a
-            # single glyph. The highlighted row keeps its normal colour -
-            # dimming the row under the cursor just makes it hard to read.
+            # single glyph - including under the selection bar.
             display_name = game.name
             x_pad_left = 0
             if is_flag:
-                if not is_sel:
-                    text_color = tuple(theme["muted_color"])
+                # Muted even under the selection bar. A marked game is
+                # marked; the highlight shouldn't make it look unmarked,
+                # and muted-on-highlight stays perfectly readable.
+                text_color = tuple(theme["muted_color"])
                 x_size = max(12, int(font.get_height() * 0.66))
                 x_pad_left = x_size + 10  # space taken by chip + gap
                 chip = pygame.Rect(rect.x + pad_x, y + (line_h - x_size) // 2,

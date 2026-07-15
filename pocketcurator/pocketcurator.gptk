@@ -29,6 +29,7 @@ l1 = pageup
 r1 = pagedown
 l2 = [
 r2 = ]
+l3 = f9
 
 up = up
 down = down

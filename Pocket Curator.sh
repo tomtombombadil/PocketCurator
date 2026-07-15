@@ -1,5 +1,5 @@
 #!/bin/bash
-# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.0.40
+# PORTMASTER: pocketcurator.zip, Pocket Curator.sh v1.1.0
 # ===========================================================================
 # Pocket Curator launcher
 # ===========================================================================
@@ -59,7 +59,8 @@ if [ -z "$PC_SKIP_UPDATE" ] && [ -f "$PC_UPDATE_DIR/READY" ] \
 PORTS="$1"; shift
 GAME="$PORTS/pocketcurator"
 STAGED="$GAME/.update/staged"
-LOGF="$GAME/update.log"
+mkdir -p "$GAME/logs" 2>/dev/null
+LOGF="$GAME/logs/update.log"
 log() { echo "[pc-update] $*"; echo "$(date '+%F %T') $*" >> "$LOGF" 2>/dev/null; }
 
 fail() {
@@ -188,8 +189,20 @@ get_controls
 
 GAMEDIR="/$directory/ports/pocketcurator"
 CONFDIR="$GAMEDIR/conf"
-mkdir -p "$CONFDIR"
+LOGDIR="$GAMEDIR/logs"
+mkdir -p "$CONFDIR" "$LOGDIR"
 cd "$GAMEDIR" || exit 1
+
+# Everything log-shaped lives under logs/ now, so the pocketcurator/
+# folder (and the ports root) stop collecting loose files. Sweep any
+# stragglers left by older versions in on this launch. Guarded moves,
+# so these are no-ops once nothing is left to relocate.
+for _old in "$GAMEDIR"/PC_*.log "$GAMEDIR"/install.log \
+            "$GAMEDIR"/update.log "$GAMEDIR"/pocketcurator.log; do
+  [ -e "$_old" ] && mv -f "$_old" "$LOGDIR/" 2>/dev/null
+done
+[ -e "$SCRIPT_DIR/upload_log_diag.txt" ] \
+  && mv -f "$SCRIPT_DIR/upload_log_diag.txt" "$LOGDIR/upload_diag.log" 2>/dev/null
 
 # Per-launch log, timestamped and retained. We used to overwrite a
 # single pocketcurator.log every launch, which destroyed the evidence
@@ -201,13 +214,13 @@ cd "$GAMEDIR" || exit 1
 # app's stdout - is piped through a timestamping filter so every line is
 # prefixed with the wall-clock time. Prefer awk strftime (fast, no
 # per-line subprocess); fall back to a read loop if this awk lacks it.
-PC_LOG="$GAMEDIR/PC_$(date '+%Y-%m-%d_%H%M%S').log"
+PC_LOG="$LOGDIR/PC_$(date '+%Y-%m-%d_%H%M%S').log"
 : > "$PC_LOG"
 # Rotate: keep the 10 newest PC_*.log, delete the rest. Timestamped
 # names sort chronologically, so sort+head yields the oldest to drop.
 _pc_rotate_logs() {
   local keep=10 all count remove
-  all=$(ls -1 "$GAMEDIR"/PC_*.log 2>/dev/null | sort)
+  all=$(ls -1 "$LOGDIR"/PC_*.log 2>/dev/null | sort)
   count=$(printf '%s\n' "$all" | grep -c .)
   if [ "$count" -gt "$keep" ]; then
     remove=$((count - keep))
@@ -237,8 +250,8 @@ fi
 # The one-file installer leaves its log in the ports root, where the
 # user trips over it. Adopt it into our folder on first launch.
 if [ -f "$SCRIPT_DIR/pocketcurator_install.log" ]; then
-  mv -f "$SCRIPT_DIR/pocketcurator_install.log" "$GAMEDIR/install.log" 2>/dev/null \
-    && pc_stage "moved installer log into pocketcurator/install.log"
+  mv -f "$SCRIPT_DIR/pocketcurator_install.log" "$LOGDIR/install.log" 2>/dev/null \
+    && pc_stage "moved installer log into pocketcurator/logs/install.log"
 fi
 
 APP_VERSION=$(grep '^__version__' "$GAMEDIR/curator/__init__.py" | sed -E 's/.*"([^"]+)".*/\1/')
