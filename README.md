@@ -3,8 +3,8 @@
 **An on-device ROM and scraped-media cleanup and download tool for retro handhelds.**
 That's right! It says DOWNLOAD. Pocket Curator not only helps you clean up your ROMs collection, now you can download ROMs direct from your device! (WebDAV support added for v1.0)
 Curate your device's ROMs in an Emulation Station-style interface. See the screenshots, read the description, see the stars rating and genre and region info. Make decisions based on more than just the game title. You can mark and delete ROMs in an easy to use familiar interface. No extra button pushes. No menus to scroll through. You can also connect to a WebDAV server and copy ROMs from it to your device... WITH scraped media, manuals, and metadata! All directly on your device. No removing the SD card. No console commands. No Samba share. No hassles.
-   ! installation requires Internet connection and may require a PC, after you install, Internet connectivity is unnecessary.
-   !! copying ROMs from a WebDAV server obviously requires WiFi
+   - Installation requires Internet connection and may require a PC, after you install, Internet connectivity is unnecessary.
+   - Copying ROMs from a WebDAV server obviously requires WiFi
 
 ![Splash](pocketcurator/assets/splash.jpg)
 ![Systems carousel](pocketcurator/assets/Screenshot-Systems.jpg)
