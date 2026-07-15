@@ -44,8 +44,8 @@ import pygame
 
 from ..fetchqueue import FetchJob, FetchQueue, MediaFile
 from ..webdav import DavClient, DavError, RemoteEntry, format_size
-from ..render import (draw_stars, draw_wrapped_text, render_clipped_text,
-                      wrap_text)
+from ..render import (draw_hint_bar, draw_stars, draw_wrapped_text,
+                      render_clipped_text, wrap_text)
 
 FETCH_GREEN = (64, 224, 96)
 EXISTS_YELLOW = (235, 200, 50)  # marked but already on the device
@@ -303,10 +303,41 @@ class RemoteBrowserScreen:
         """
         lookup = self._system_lookup()
         decoded = urllib.parse.unquote(href)
-        for seg in reversed([s for s in decoded.split("/") if s]):
+        segs = [s for s in decoded.split("/") if s]
+        for seg in reversed(segs):
             hit = lookup.get(_norm(seg))
             if hit is not None:
                 return self._resolve_family(seg, hit)
+        # No folder on this device matched the remote name. Ask the matrix
+        # where THIS firmware keeps the system the remote folder names, and
+        # route there even if that folder isn't set up yet - it gets created
+        # at copy time. This is the whole point of the matrix: remote folder
+        # + firmware -> destination (atarijaguar on Batocera -> roms/jaguar).
+        return self._matrix_dest(segs)
+
+    def _matrix_dest(self, segs) -> Optional[dict]:
+        """Destination computed purely from the folder matrix, for a system
+        the device has no folder for yet. Returns None when the matrix has
+        no mapping (the caller then offers a manual folder pick)."""
+        try:
+            from ..system_matrix import get_matrix
+            matrix = get_matrix()
+            roms = getattr(self.app, "roms_dir", None)
+            fw = getattr(self.app, "firmware_name", "") or ""
+            if roms is None:
+                return None
+            for seg in reversed(segs):
+                leaf = matrix.folder_for(seg, fw)
+                if leaf:
+                    row = matrix.row_for(seg) or {}
+                    display = (row.get("region_na") or leaf).strip() or leaf
+                    print(f"[fetch] '{seg}' -> {leaf} "
+                          f"(matrix; firmware {fw}; folder created if absent)")
+                    return {"shortname": leaf, "display": display,
+                            "path": Path(roms) / leaf, "extensions": [],
+                            "theme": leaf, "rom_count": 0}
+        except Exception as exc:  # noqa: BLE001 - routing must never crash
+            print(f"[fetch] matrix destination lookup failed: {exc}")
         return None
 
     def _resolve_family(self, remote_name: str, hit: dict) -> dict:
@@ -600,6 +631,18 @@ class RemoteBrowserScreen:
                 "real location on your device. Nothing was copied.",
                 5000)
             return
+        # The destination may not exist yet - the matrix routed us to a
+        # system this device never set up, or the user hand-picked a
+        # folder. Create it now (safe: we've already proven dest is an
+        # absolute path outside the port dir).
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            print(f"[fetch] could not create destination {dest}: {exc}")
+            self._toastline(
+                f"Couldn't create the folder {dest.name}. Nothing copied.",
+                5000)
+            return
         # ONE queue for the whole session; every job carries its own
         # destination, so marking more games mid-copy - same system or
         # a different one - just grows the queue and the progress bar.
@@ -860,16 +903,11 @@ class RemoteBrowserScreen:
 
     def _confirm_copy(self) -> None:
         if self.context is None:
-            from .remote_flow import NoticeScreen
-
-            def clear():
-                self.flagged.clear()
-                self.flagged_existing.clear()
-            self.app.push_screen(NoticeScreen(
-                self.app, "Can't copy here",
-                "Your device does not have a matching roms folder for "
-                "this game system. These files can't be copied.",
-                ok_label="A Cancel", on_close=clear))
+            # Every automatic route came up empty (no matching device
+            # folder, and the matrix had no mapping for this remote name).
+            # Rather than dead-end the user, let them point the copy at a
+            # folder under roms/ themselves - the final catch-all.
+            self._offer_manual_dest()
             return
         if not self.flagged:
             self._toastline("Mark games with A first.", 3000)
@@ -891,6 +929,60 @@ class RemoteBrowserScreen:
         self.app.push_screen(RemoteConfirmScreen(
             self.app, self.context, marked, rom_bytes,
             media_sizer=size_media, on_choice=self._start_copy))
+
+    # ---- manual destination (final fallback) --------------------------
+
+    # Never valid copy targets, so keep them out of the manual picker.
+    _NOT_DEST_FOLDERS = {
+        "ports", "tools", "system", "userdata", "media", "themes",
+        "screenshots", "bios", "images", "videos", "manuals", "boxart",
+        "marquees", "thumbnails", "downloaded_images", "downloaded_videos",
+        "downloaded_videos_cache", "lost+found",
+    }
+
+    def _roms_folders(self):
+        """Every real sub-folder of roms/, minus the media/system ones,
+        as (name, path) pairs sorted by name."""
+        roms = getattr(self.app, "roms_dir", None)
+        if not roms:
+            return []
+        out = []
+        try:
+            for d in sorted(Path(roms).iterdir(), key=lambda p: p.name.lower()):
+                if not d.is_dir():
+                    continue
+                if d.name.startswith(".") or d.name.lower() in self._NOT_DEST_FOLDERS:
+                    continue
+                out.append((d.name, d))
+        except OSError:
+            pass
+        return out
+
+    def _offer_manual_dest(self):
+        from .remote_flow import FolderPickScreen, NoticeScreen
+        folders = self._roms_folders()
+        if not folders:
+            def clear():
+                self.flagged.clear()
+                self.flagged_existing.clear()
+            self.app.push_screen(NoticeScreen(
+                self.app, "Can't copy here",
+                "This device has no roms folders to copy into yet.",
+                ok_label="A Cancel", on_close=clear))
+            return
+        self.app.push_screen(FolderPickScreen(
+            self.app, folders, on_pick=self._use_manual_dest))
+
+    def _use_manual_dest(self, path):
+        """The user hand-picked a destination folder. Adopt it as the
+        context and resume the copy (context is now set, so _confirm_copy
+        goes straight to the confirmation dialog)."""
+        self.context = {"shortname": path.name, "display": path.name,
+                        "path": path, "extensions": [], "theme": path.name,
+                        "rom_count": 0}
+        print(f"[fetch] manual destination chosen: {path}")
+        self._toastline(f"Copying into {path.name}.")
+        self._confirm_copy()
 
     # ------------------------------------------------------------------
     # Preview (remote gamelist + screenshot)
@@ -1257,8 +1349,15 @@ class RemoteBrowserScreen:
                          (10, rect.y + (rect.h - font.get_height()) // 2))
             return
         n = len(self.flagged)
-        mark = f"A Mark ({n})" if n else "A Mark / Open"
-        legend = (f"{mark}  -  Start All  -  X Copy  -  Y Jump  -  "
-                  f"Sel Settings  -  B Back")
-        surface.blit(font.render(legend, True, fg),
-                     (10, rect.y + (rect.h - font.get_height()) // 2))
+        mark = f"Mark ({n})" if n else "Mark / Open"
+        # Same button order and bold-chip styling as the delete screen.
+        hints = [
+            [("chip", "A"), ("txt", mark)],
+            [("chip", "B"), ("txt", "Back")],
+            [("chip", "X"), ("txt", "Copy")],
+            [("chip", "Y"), ("txt", "Jump")],
+            [("chip", "SEL"), ("txt", "Settings")],
+            [("chip", "ST"), ("txt", "All")],
+        ]
+        draw_hint_bar(surface, rect, self.app.fonts,
+                      ui["font_size_base"], theme, hints)

@@ -28,6 +28,7 @@ from ..gamelist import Game
 #   yellow ?   -> marked, but already on the device
 DELETE_RED = (232, 62, 62)
 from ..render import (
+    draw_hint_bar,
     draw_stars,
     draw_wrapped_text,
     render_clipped_text,
@@ -692,22 +693,23 @@ class GameListScreen:
 
     def _draw_legend(self, surface, theme, ui, rect) -> None:
         pygame.draw.rect(surface, tuple(theme["legend_bg_color"]), rect)
-        font = self.app.fonts.get(max(11, int(ui["font_size_base"] * 0.7)))
-        text_color = tuple(theme["legend_text_color"])
 
         flagged_count = len(self.flagged)
-        delete_hint = f"X Delete ({flagged_count})" if flagged_count else "X Delete"
+        delete_label = (f"Delete ({flagged_count})" if flagged_count
+                        else "Delete")
 
-        items = [
-            "A Mark",
-            "Start All",
-            "B Back",
-            delete_hint,
-            "Y Jump",
-            "Sel Settings",
-            "L1/R1 PgUp/PgDn",
+        # Button order A, B, X, Y, L1/R1, Select, Start. Face buttons and
+        # L1/R1/Sel/Start show as bold highlight-coloured chips (like the
+        # game markers); the "/" between L1 and R1 stays plain. No bullet
+        # separators - the chips do the separating.
+        hints = [
+            [("chip", "A"), ("txt", "Mark")],
+            [("chip", "B"), ("txt", "Back")],
+            [("chip", "X"), ("txt", delete_label)],
+            [("chip", "Y"), ("txt", "Jump")],
+            [("chip", "L1"), ("txt", "/"), ("chip", "R1"), ("txt", "PgUp/Dn")],
+            [("chip", "SEL"), ("txt", "Settings")],
+            [("chip", "ST"), ("txt", "All")],
         ]
-        legend_str = "  \u2022  ".join(items)
-        surf = font.render(legend_str, True, text_color)
-        surface.blit(surf, (rect.x + 8,
-                            rect.y + (rect.height - surf.get_height()) // 2))
+        draw_hint_bar(surface, rect, self.app.fonts,
+                      ui["font_size_base"], theme, hints)

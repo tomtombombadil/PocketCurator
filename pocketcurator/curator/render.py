@@ -334,3 +334,73 @@ def split_layout(surface_w, content_top, content_h, list_width_pct, side):
         list_rect = pygame.Rect(0, content_top, list_w, content_h)
         panel_rect = pygame.Rect(list_w, content_top, panel_w, content_h)
     return list_rect, panel_rect
+
+
+def draw_hint_bar(surface, rect, fonts, base_font_size, theme, hints):
+    """Bottom hint / legend bar.
+
+    ``hints`` is a list of hints; each hint is a list of (kind, value)
+    segments::
+
+        [("chip", "A"), ("txt", "Mark")]                  -> [A] Mark
+        [("chip", "L1"), ("txt", "/"), ("chip", "R1"),
+         ("txt", "PgUp/Dn")]                               -> [L1]/[R1] PgUp/Dn
+
+    A "chip" is a rounded highlight-coloured square holding a BOLD black
+    glyph (mirrors the game-row marker chips, just in the user's highlight
+    colour); "txt" is a plain label. Hints are separated by a wide gap;
+    within a hint the gap is small, and a "/" segment hugs its neighbours
+    tighter still. The row auto-shrinks its font to a readable floor so it
+    fits the bar width on 4:3 / 1:1 screens. Presentational only - it
+    draws, holds no state, and changes nothing.
+    """
+    hi = tuple(theme["highlight_color"])
+    label_c = tuple(theme["legend_text_color"])
+    avail = max(1, rect.width - 16)
+    top = max(11, int(base_font_size * 0.7))
+    floor = max(10, int(base_font_size * 0.52))
+
+    def _layout(sz):
+        """Place every segment left-to-right at font size ``sz``. Returns
+        (placed, total_width, reg_font, bold_font, chip_side)."""
+        reg = fonts.get(sz)
+        bold = fonts.get(sz, bold=True)
+        gap_grp = max(10, int(sz * 0.85))     # between hints
+        gap_seg = max(4, int(sz * 0.34))      # chip <-> its label
+        gap_tight = max(2, int(sz * 0.16))    # around a "/"
+        side = int(reg.get_height() * 0.9)
+        placed = []                           # (kind, value, x, width)
+        x = 0
+        for h_i, hint in enumerate(hints):
+            if h_i:
+                x += gap_grp
+            prev = None
+            for s_i, (kind, val) in enumerate(hint):
+                if s_i:
+                    x += gap_tight if (val == "/" or prev == "/") else gap_seg
+                if kind == "chip":
+                    w = max(side, bold.size(val)[0] + max(6, int(sz * 0.5)))
+                else:
+                    w = reg.size(val)[0]
+                placed.append((kind, val, x, w))
+                x += w
+                prev = val
+        return placed, x, reg, bold, side
+
+    sz = top
+    while sz > floor and _layout(sz)[1] > avail:
+        sz -= 1
+    placed, _, reg, bold, side = _layout(sz)
+
+    ox = rect.x + 8
+    cy = rect.y + rect.height // 2
+    for kind, val, x, w in placed:
+        if kind == "chip":
+            chip = pygame.Rect(ox + x, cy - side // 2, w, side)
+            pygame.draw.rect(surface, hi, chip, border_radius=3)
+            g = bold.render(val, True, (0, 0, 0))
+            surface.blit(g, (chip.centerx - g.get_width() // 2,
+                             chip.centery - g.get_height() // 2))
+        else:
+            t = reg.render(val, True, label_c)
+            surface.blit(t, (ox + x, cy - t.get_height() // 2))

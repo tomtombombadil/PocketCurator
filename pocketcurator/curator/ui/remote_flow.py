@@ -239,6 +239,27 @@ class NoticeScreen:
 # Screens
 # ----------------------------------------------------------------------
 
+class FolderPickScreen(_MenuScreen):
+    """Last-resort manual destination picker. The remote folder matched no
+    system on this device and the matrix had no mapping for it either, so
+    let the user point the copy at any folder under roms/ themselves. Only
+    reached after every automatic route has come up empty."""
+
+    def __init__(self, app, folders, on_pick):
+        super().__init__(app, "Where should these go?",
+                         footer="A choose folder   B cancel")
+        self._folders = folders          # list of (name, Path)
+        self.items = [name for name, _ in folders]
+        self.status = "No matching system found - pick a roms folder."
+        self._on_pick = on_pick
+
+    def _activate(self, index: int) -> None:
+        if 0 <= index < len(self._folders):
+            _, path = self._folders[index]
+            self.app.pop_screen()
+            self._on_pick(path)
+
+
 class SourcePickerScreen(_MenuScreen):
     """Known servers at the top, then Scan / Enter. The item list is
     rebuilt every frame from settings, so a server saved during this

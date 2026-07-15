@@ -32,10 +32,11 @@ from typing import List, Optional, Set
 ES_CONFIG_CANDIDATES: List[Path] = [
     Path("/storage/.emulationstation"),                # Rocknix / JELOS / AmberELEC
     Path("/storage/.config/emulationstation"),         # variants
-    Path("/userdata/system/.emulationstation"),        # Batocera / Knulli
+    Path("/userdata/system/configs/emulationstation"),  # Batocera / Knulli (live config)
+    Path("/userdata/system/.emulationstation"),        # older Batocera layout
     Path("/home/ark/.emulationstation"),               # ArkOS / dArkOS
-    Path("/etc/emulationstation"),                     # system-bundled fallback
-    Path("/usr/share/emulationstation"),               # really last resort
+    Path("/usr/share/emulationstation"),               # distro-generated full system list
+    Path("/etc/emulationstation"),                     # last-resort bundled stub
 ]
 
 

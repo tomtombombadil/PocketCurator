@@ -2,6 +2,15 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.1.1] - 2026-07-15
+
+Fetch destination fixes and a refreshed hint bar.
+
+- Fetch now routes copied games to the folder your firmware actually uses (from the system matrix) and creates that folder when the device hasn't set the system up yet - so a system with no folder on the device still copies to the right place.
+- When no destination can be worked out automatically, Pocket Curator asks you to pick a folder under roms/ instead of refusing the copy.
+- More reliable EmulationStation config discovery on Batocera / Knulli, so the full system list is read instead of a partial fallback.
+- The button-hint bar on the delete and fetch screens is reordered and restyled - the button labels now read as chips in your highlight colour.
+
 ## [1.1.0] - 2026-07-15
 
 First stable release since 1.0.0. It rolls up the 1.0.x line and refreshes
