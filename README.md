@@ -27,13 +27,14 @@ Delete Mode helps you:
    - Mark as many ROMs for deletion as you want, then with two button presses delete the all the marked ROMs and their scraped files.
 
 Fetch Mode helps you:
-   - Connect to a server with ROMs and copy them to your device
+   - Connect to a server with ROMs and copy them to your device (WebDAV only)
    - Shows you the screenshot and metadata of the ROMs you're looking to copy (assuming the server you connect to has the ROMs properly scraped!)
    - Copies the metadata and screenshot along with the ROMs (Pocket Curator calls them 'scrapings')
    - Finds the right folder for you, no scrolling through that long systems list, placing ROMs where they belong
    - Lets you copy 1 or a thousand files at once, showing a progress bar and a count
    - Copies files quickly at full HTTP speeds - no Samba overhead
    - Refreshes the games list for you, saving you faffing about in menus
+   - Works on a freshly-installed device with no ROMs yet - connect to your server and pull your first games; the systems show up as soon as you copy games into them, no restart needed
 
 **How does deleting ROMs work in Pocket Curator?**
 Simple. You're in a visual interface that looks just like Emulation Station. (sorry, your themes aren't implemented) You scroll through the games list, just like you do in Emulation Station. Press A to mark a game to be deleted. Keep scrolling and marking. When you're done marking, press X to view a list of what you're about to delete and how much space you'll get back. Press X again to confirm the delete and the games and their scraped files are deleted. When you exit Pocket Curator, it automatically refreshes your games list. Easy, fast, and efficient!
@@ -126,7 +127,7 @@ Misc:
    - R36H (You will need a wifi dongle for installation!)
    - Kinhank K36 (You will need a wifi dongle for installation!)
 
-I see no reason Pocket Curator would NOT work on any handheld that is supported by Rocknix or Knulli, so long as it uses the libs.aarch64 libraries and you can get the device connected to the Internet for the installation, it should work just fine. After installation, Pocket Curator operates without need for an Internet connection, a PC, or for you to remove your SD card. **You DO need sn Internet connection for the update checker / update installer.**
+I see no reason Pocket Curator would NOT work on any handheld that is supported by Rocknix or Knulli, so long as it uses the libs.aarch64 libraries and you can get the device connected to the Internet for the installation, it should work just fine. After installation, Pocket Curator operates without need for an Internet connection, a PC, or for you to remove your SD card. **You DO need an Internet connection for the update checker / update installer.**
 
 ## Quick Install Instructions
 
@@ -163,6 +164,7 @@ That's it! Easy peasy lemon squeezy. ;)
    - L1/R1 - PgUp/PgDn in your games list
    - L2/R2 - scroll game description
    - Select - Settings
+   - Start - Select All / Select None toggle
 
 **Fetch Mode Games List**
    - Up/Down - scroll through your games
@@ -173,18 +175,21 @@ That's it! Easy peasy lemon squeezy. ;)
    - L1/R1 - PgUp/PgDn in your games list
    - L2/R2 - scroll game description
    - Select - Settings
+   - Start - Select All / Select None toggle
 
 ## Settings
 
 Pressing Select will take you to the Pocket Curator Settings screen. These settings are available:
-   - Update Pocket Curator - if you're connected to the Internet and your clock is set properly, it will check this GitHub repo for the latest version and install it for you
-   - Status - shows your current version, where your ROMs are located, the detected firmware version, and free space on your SD card
-   - Restore Games List Backup - any time Pocket Curator alters your games list (like when fetching ROMs and injecting metadata) it backs up the originals, just in case!
-   - Font Size - changes the size of the font in Pocket Curator.
-   - Auto-scroll description - enabling this will cause the game descriptions on the games list to scroll automatically up and down
-   - Safe Mode - enabling this will cause Pocket Curator to NOT delete anything! You can use this to test it out without fear.
-   - Delete Scraped Media - this is enabled by default, turning it off will cause Pocket Curator to ONLY delete the game ROM/ZIP file. It will NOT delete the scraped files for that game.
+   - Check For Updates - if you're connected to the Internet and your clock is set properly, it will check this GitHub repo for the latest version and install it for you
+   - Status - shows your current version, the detected firmware version, where your ROMs are located, and free space on your SD card, the detected theme, if you're connected to the Internet, and your clock's status
+   - Font Size - change the base font size in Pocket Curator's UI.
+   - Font Color - change the text color in Pocket Curator's UI.
+   - Highlight Color - change the color of the highlight bar in Pocket Curator's UI.
+   - Swap Games List Side - Pocket Curator defaults to listing the games on the left ad showing the screenshot/metadata on the right. This has them swap places.
+   - Delete Scraped Files with ROMs - this is enabled by default, turning it off will cause Pocket Curator to ONLY delete the game ROM/ZIP file. It will NOT delete the scraped files for that game.
+   - Auto-Scroll Description - enabling this will cause the game descriptions on the games list to scroll automatically up and down
    - Rating Display - two options here Text or Stars. It controls which appears in games list display for the rating of the game: stars or a number.
+   - Restore Games List Backup - any time Pocket Curator alters your games list (like when fetching ROMs and injecting metadata) it backs up the originals, just in case!
 
 The Settings screen also shows a line of help text for the selected setting, and a line of help text for controls. Settings persist in `pocketcurator/settings.json`.
 
@@ -200,7 +205,7 @@ Pocket Curator now connects to WebDAV servers. Why WebDAV? Because its a simple 
 
 That starts the WebDAV server and points it to my ROMs collection. I also does two VERY important things: it sets what port the WebDAV server communicates on, and it sets the server to READ-ONLY. That means no one can delete your ROMs or do nasty things to your PC. All they can do is copy files.
 
-Next we have to talk about how to organize your ROMs in that folder you pointed to. Pocket Curator ASSUMES (I know, I know, ass-u-me...) that your ROMs are stored in the same type of folder tree as they are on your device. Some allowances are made for the slight differences between Batocera, Knulli, Rocknix, dArkOS, and AmberELEC. But the point is: you should have them stored in folders named like the system folders on your sd card. (In other words: gba for Game Boy Advance, nes for Nintendo Entertainment System, mame for MAME, etc.) Pocket Curator will try to guess when there are more than one option For example: is it tg16 or pcengine? Is it genesis or megadrive?
+Next we have to talk about how to organize your ROMs in that folder you pointed to. Pocket Curator ASSUMES (I know, I know, ass-u-me...) that your ROMs are stored in the same type of folder tree as they are on your device. Some allowances are made for the slight differences between Batocera, Knulli, Rocknix, dArkOS, and AmberELEC. But the point is: you should have them stored in folders named like the system folders on your sd card. (In other words: gba for Game Boy Advance, nes for Nintendo Entertainment System, mame for MAME, etc.) Pocket Curator will try to guess when there are more than one option. For example: is it tg16 or pcengine? Is it genesis or megadrive? Pocket Curator looks at your set region and where you already have ROMs, and puts the games in the right places.
 
 Chances are, you already have your ROMs sorted into folders like this with the scraped files and gameslist.xml files already because this is where you copy your files onto your sd card from. So if that's the case, you're ready to go! Point rclone at that roms folder and your WebDAV server is ready for Pocket Curator to copy games like a champ!
 
