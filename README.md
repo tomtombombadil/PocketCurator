@@ -107,15 +107,15 @@ Anbernic:
    - RG 35xx SP
    - RG 40xx H & V
    - RG 552
-   - BatleXP G350 (You will need a wifi dongle for installation!)
+   - BatleXP G350 (You will need a wifi dongle for Internet install or WebDAV fetching!)
 
 Powkiddy:
    - RGB10 MAX3
    - RGB20 Pro
    - RGB30
-   - V10 (You will need a wifi dongle for installation!)
-   - V90S (You will need a wifi dongle for installation!)
-   - X35H (You will need a wifi dongle for installation!)
+   - V10 (You will need a wifi dongle for Internet install or WebDAV fetching!)
+   - V90S (You will need a wifi dongle for Internet install or WebDAV fetching!)
+   - X35H (You will need a wifi dongle for Internet install or WebDAV fetching!)
    - X55
 
 TrimUI:
@@ -125,14 +125,15 @@ TrimUI:
    - Smart Pro S
 
 Misc:
-   - R36S (You will need a wifi dongle for installation!)
-   - R36H (You will need a wifi dongle for installation!)
-   - Kinhank K36 (You will need a wifi dongle for installation!)
+   - R36S (You will need a wifi dongle for Internet install or WebDAV fetching!)
+   - R36H (You will need a wifi dongle for Internet install or WebDAV fetching!)
+   - Kinhank K36 (You will need a wifi dongle for Internet install or WebDAV fetching!)
 
 I see no reason Pocket Curator would NOT work on any handheld that is supported by Rocknix or Knulli, so long as it uses the libs.aarch64 libraries and you can get the device connected to the Internet for the installation, it should work just fine. After installation, Pocket Curator operates without need for an Internet connection, a PC, or for you to remove your SD card. **You DO need an Internet connection for the update checker / update installer.**
 
 ## Quick Install Instructions
 
+WITH INTERNET ACCESS:
  1) Boot up your handheld and make sure you have:
      - up to date firmware
      - up to date PortMaster
@@ -145,6 +146,19 @@ I see no reason Pocket Curator would NOT work on any handheld that is supported 
  6) PortMaster will connect to this github repository (via WiFi), show some installation messages, and install the latest release of Pocket Curator. When it finishes, Emulation Station will refresh your gameslist again.
 
 That's it! Easy peasy lemon squeezy. ;)
+
+WITHOUT INTERNET ACCESS:
+ 1) Boot up your handheld and make sure you have:
+     - up to date firmware
+     - up to date PortMaster
+     - at least ONE Port installed with PortMaster (or Ports won't show as a system in some firmwares)
+ 2) On your PC or phone, download the latest release's .ZIP file, such as **`pocketcurator_port-v1.01.0.zip`** from the release page. https://github.com/tomtombombadil/PocketCurator/releases
+ 3) Copy that .ZIP file (ex: **`pocketcurator_port-v1.01.0.zip`**) to the **`roms/ports`** folder on your SD card. (You can do this via SSH, SCP, SAMBA, or simply remove the SD card from your handheld and put it in your PC or phone)
+ 4) Unzip the .ZIP file. It's probably easiest to do this while the SD card is in your PC or phone, but you can do this via SAMBA or SSH once the SD card is back in your handheld. IF YOU NEED TO UNZIP THE FILE ON YOUR DEVICE USING SSH, HERE IS THE COMMAND: **`unzip pocketcurator_port-v1.01.0.zip`** Obviously, match the filename of the zip file to the release that you downloaded. This SSH command to unzip is THE most reliable way to install Pocket Curator manually.
+ 5) After unzipping, your **`roms/ports`** folder should have a **`pocketcurator`** folder and a **`Pocket Curator.sh`** file. If it doesn't, then you've not unzipped the file properly.
+ 6) From the Main Menu in Emulation Station, select GAME SETTINGS and UPDATE GAMESLISTS. This will refresh the list of your games, and make **`Pocket Curator`** appear on your list of Ports.
+
+That's it! Pocket Curator is installed.
 
 ## Controls
 
