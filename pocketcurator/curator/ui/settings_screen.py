@@ -282,9 +282,9 @@ class SettingsScreen:
         surface.blit(title, (40, 24))
 
         # Version, right-justified opposite the title.
-        from .. import __version__, __build__
+        from .. import __version__
         ver_font = self.app.fonts.get(max(12, int(base * 0.8)))
-        ver_surf = ver_font.render(f"v{__version__}  build {__build__}",
+        ver_surf = ver_font.render(f"v{__version__}",
                                    True, muted)
         surface.blit(
             ver_surf,
@@ -378,11 +378,18 @@ class SettingsScreen:
         hint_y = H - bottom_block_h + 4
         surface.blit(hint, (40, hint_y))
 
-        legend = hint_font.render(
-            "Up / Down: Choose   -   Left / Right: Change   -   "
-            "L1 / R1: Jump   -   B: Back",
-            True, tuple(theme["legend_text_color"]))
-        surface.blit(legend, (40, hint_y + hint_h + line_gap))
+        from ..render import draw_hint_bar
+        legend_rect = pygame.Rect(
+            32, hint_y + hint_h + line_gap,
+            W - 32, hint_font.get_linesize())
+        hints = [
+            [("updown",), ("txt", "Choose")],
+            [("leftright",), ("txt", "Change")],
+            [("chip", "B"), ("txt", "Back")],
+            [("chip", "L1"), ("txt", "/"), ("chip", "R1"), ("txt", "Jump")],
+        ]
+        draw_hint_bar(surface, legend_rect, self.app.fonts,
+                      base, theme, hints)
 
     @staticmethod
     def _draw_tri(surface, cx, y, color, up: bool):

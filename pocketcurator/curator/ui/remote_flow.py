@@ -163,8 +163,9 @@ class _MenuScreen:
             surface.blit(small.render(self.status, True, muted),
                          (box.x + pad, box.bottom - pad
                           - small.get_linesize() * 2))
-        surface.blit(small.render(self.footer, True, muted),
-                     (box.x + pad, box.bottom - pad - small.get_linesize()))
+        from ..render import render_prompt
+        fs = render_prompt(small, theme, self.footer)
+        surface.blit(fs, (box.x + pad, box.bottom - pad - small.get_linesize()))
 
 
 class NoticeScreen:

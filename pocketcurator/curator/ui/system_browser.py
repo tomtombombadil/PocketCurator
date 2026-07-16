@@ -316,9 +316,9 @@ class SystemBrowserScreen:
         # this sat in the bottom-right of the legend bar where the help
         # text could overrun it; the firmware/roms/theme line that used
         # to be here has moved to the Settings screen.)
-        from .. import __version__, __build__
+        from .. import __version__
         ver_font = self.app.fonts.get(max(11, int(ui["font_size_base"] * 0.7)))
-        ver_surf = ver_font.render(f"v{__version__}  build {__build__}",
+        ver_surf = ver_font.render(f"v{__version__}",
                                    True, tuple(theme["muted_color"]))
         surface.blit(ver_surf,
                      ((screen_w - ver_surf.get_width()) // 2,
@@ -330,9 +330,11 @@ class SystemBrowserScreen:
             surface.blit(msg,
                          ((screen_w - msg.get_width()) // 2,
                           screen_h // 2 - msg.get_height()))
-            hint = small_font.render(
+            from ..render import render_prompt
+            hint = render_prompt(
+                small_font, theme,
                 "Press Y to connect to a WebDAV server and copy ROMs onto "
-                "your device.", True, tuple(theme["accent_color"]))
+                "your device.")
             surface.blit(hint,
                          ((screen_w - hint.get_width()) // 2,
                           screen_h // 2 + 6))
@@ -423,33 +425,20 @@ class SystemBrowserScreen:
         rect = pygame.Rect(0, surface.get_height() - legend_h,
                            surface.get_width(), legend_h)
         pygame.draw.rect(surface, tuple(theme["legend_bg_color"]), rect)
-        color = tuple(theme["legend_text_color"])
 
-        # Directions first, then A, B, X, Y, Select - Title Case. The
-        # font shrinks until the whole line fits the screen width, so
-        # no resolution or font-size setting can push entries off the
-        # right edge (seen on the 1280-wide Smart Pro S).
-        sep = "  -  "
-        text = ("Navigate" + sep + "A Enter" + sep + "B Exit"
-                + sep + "X Delete System" + sep + "Y WebDAV"
-                + sep + "Sel Settings")
-
-        size = max(11, int(ui["font_size_base"] * 0.7))
-        while size > 10:
-            font = self.app.fonts.get(size)
-            icon_w = font.get_height() + 6
-            if icon_w + 8 + font.size(text)[0] + 16 <= rect.w:
-                break
-            size -= 1
-        font = self.app.fonts.get(size)
-        icon_w = font.get_height() + 6
-
-        x = rect.x + 8
-        y_center = rect.y + rect.height // 2
-        self._blit_dpad(surface, color, x, y_center, font.get_height())
-        x += icon_w + 6
-        label = font.render(text, True, color)
-        surface.blit(label, (x, y_center - label.get_height() // 2))
+        # Navigate (d-pad) first, then the face buttons and Select as
+        # chips. draw_hint_bar auto-shrinks to fit any screen width.
+        from ..render import draw_hint_bar
+        hints = [
+            [("dpad",), ("txt", "Navigate")],
+            [("chip", "A"), ("txt", "Enter")],
+            [("chip", "B"), ("txt", "Exit")],
+            [("chip", "X"), ("txt", "Delete System")],
+            [("chip", "Y"), ("txt", "WebDAV")],
+            [("chip", "SEL"), ("txt", "Settings")],
+        ]
+        draw_hint_bar(surface, rect, self.app.fonts,
+                      ui["font_size_base"], theme, hints)
 
     @staticmethod
     def _blit_dpad(surface, color, x, y_center, h):

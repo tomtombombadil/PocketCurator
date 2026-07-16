@@ -336,23 +336,95 @@ def split_layout(surface_w, content_top, content_h, list_width_pct, side):
     return list_rect, panel_rect
 
 
+# =====================================================================
+#  Button-hint rendering: chips for face buttons (A/B/X/Y) and named
+#  buttons (L1/R1/SEL/ST), plus un-chipped navigation symbols drawn in
+#  the highlight colour - a d-pad cross for "navigate all ways" and
+#  opposing-triangle pairs for up/down and left/right (four-way triangles
+#  blur together at footer size, so the d-pad stays for the all-ways one).
+#  Shared by the bottom hint bars and the in-window prompt lines so every
+#  button reference in the app looks the same.
+# =====================================================================
+
+def _draw_dpad(surface, x, cy, side, color):
+    size = int(side * 0.9); size -= size % 2; bar = max(3, size // 3)
+    cx = x + side // 2
+    pygame.draw.rect(surface, color,
+                     pygame.Rect(cx - bar // 2, cy - size // 2, bar, size), border_radius=2)
+    pygame.draw.rect(surface, color,
+                     pygame.Rect(cx - size // 2, cy - bar // 2, size, bar), border_radius=2)
+
+
+def _tri(surface, cx, cy, base, height, direction, color):
+    b = base // 2
+    if direction == "up":
+        pts = [(cx, cy - height // 2), (cx - b, cy + height // 2), (cx + b, cy + height // 2)]
+    elif direction == "down":
+        pts = [(cx, cy + height // 2), (cx - b, cy - height // 2), (cx + b, cy - height // 2)]
+    elif direction == "left":
+        pts = [(cx - height // 2, cy), (cx + height // 2, cy - b), (cx + height // 2, cy + b)]
+    else:  # right
+        pts = [(cx + height // 2, cy), (cx - height // 2, cy - b), (cx - height // 2, cy + b)]
+    pygame.draw.polygon(surface, color, pts)
+
+
+def _draw_updown(surface, x, cy, side, color):
+    cx = x + side // 2; th = int(side * 0.34); gap = max(2, int(side * 0.12)); bw = int(side * 0.62)
+    _tri(surface, cx, cy - gap - th // 2, bw, th, "up", color)
+    _tri(surface, cx, cy + gap + th // 2, bw, th, "down", color)
+
+
+def _draw_leftright(surface, x, cy, side, color):
+    cx = x + side // 2; th = int(side * 0.34); gap = max(2, int(side * 0.12)); bh = int(side * 0.62)
+    _tri(surface, cx - gap - th // 2, cy, bh, th, "left", color)
+    _tri(surface, cx + gap + th // 2, cy, bh, th, "right", color)
+
+
+_NAV_SYMBOLS = {"dpad": _draw_dpad, "updown": _draw_updown, "leftright": _draw_leftright}
+
+
+def _seg_width(kind, val, sz, reg, bold, side):
+    if kind == "chip":
+        return max(side, bold.size(val)[0] + max(6, int(sz * 0.5)))
+    if kind in _NAV_SYMBOLS:
+        return side
+    return reg.size(val)[0]
+
+
+def _draw_seg(surface, x, cy, kind, val, sz, reg, bold, side, hi, label_c):
+    """Draw one segment at (x, vertical-centre cy); return its width."""
+    if kind == "chip":
+        w = max(side, bold.size(val)[0] + max(6, int(sz * 0.5)))
+        chip = pygame.Rect(x, cy - side // 2, w, side)
+        pygame.draw.rect(surface, hi, chip, border_radius=3)
+        g = bold.render(val, True, (0, 0, 0))
+        surface.blit(g, (chip.centerx - g.get_width() // 2, chip.centery - g.get_height() // 2))
+        return w
+    if kind in _NAV_SYMBOLS:
+        _NAV_SYMBOLS[kind](surface, x, cy, side, hi)
+        return side
+    t = reg.render(val, True, label_c)
+    surface.blit(t, (x, cy - t.get_height() // 2))
+    return t.get_width()
+
+
 def draw_hint_bar(surface, rect, fonts, base_font_size, theme, hints):
     """Bottom hint / legend bar.
 
     ``hints`` is a list of hints; each hint is a list of (kind, value)
     segments::
 
-        [("chip", "A"), ("txt", "Mark")]                  -> [A] Mark
+        [("dpad",), ("txt", "Navigate")]                  -> d-pad + label
+        [("chip", "A"), ("txt", "Enter")]                 -> [A] Enter
+        [("updown",), ("txt", "Change")]                  -> up/down + label
         [("chip", "L1"), ("txt", "/"), ("chip", "R1"),
          ("txt", "PgUp/Dn")]                               -> [L1]/[R1] PgUp/Dn
 
-    A "chip" is a rounded highlight-coloured square holding a BOLD black
-    glyph (mirrors the game-row marker chips, just in the user's highlight
-    colour); "txt" is a plain label. Hints are separated by a wide gap;
-    within a hint the gap is small, and a "/" segment hugs its neighbours
-    tighter still. The row auto-shrinks its font to a readable floor so it
-    fits the bar width on 4:3 / 1:1 screens. Presentational only - it
-    draws, holds no state, and changes nothing.
+    Chips are highlight-coloured with a BOLD black glyph; nav symbols
+    (dpad/updown/leftright) are drawn in the highlight colour, un-chipped.
+    Hints are separated by a wide gap; within a hint the gap is small, and
+    a "/" segment hugs its neighbours tighter. Auto-shrinks the font to a
+    readable floor so it fits 4:3 / 1:1 widths. Presentational only.
     """
     hi = tuple(theme["highlight_color"])
     label_c = tuple(theme["legend_text_color"])
@@ -361,46 +433,112 @@ def draw_hint_bar(surface, rect, fonts, base_font_size, theme, hints):
     floor = max(10, int(base_font_size * 0.52))
 
     def _layout(sz):
-        """Place every segment left-to-right at font size ``sz``. Returns
-        (placed, total_width, reg_font, bold_font, chip_side)."""
-        reg = fonts.get(sz)
-        bold = fonts.get(sz, bold=True)
-        gap_grp = max(10, int(sz * 0.85))     # between hints
-        gap_seg = max(4, int(sz * 0.34))      # chip <-> its label
-        gap_tight = max(2, int(sz * 0.16))    # around a "/"
+        reg = fonts.get(sz); bold = fonts.get(sz, bold=True)
+        gap_grp = max(10, int(sz * 0.85)); gap_seg = max(4, int(sz * 0.34)); gap_tight = max(2, int(sz * 0.16))
         side = int(reg.get_height() * 0.9)
-        placed = []                           # (kind, value, x, width)
-        x = 0
+        placed = []; x = 0
         for h_i, hint in enumerate(hints):
             if h_i:
                 x += gap_grp
             prev = None
-            for s_i, (kind, val) in enumerate(hint):
+            for s_i, seg in enumerate(hint):
+                kind = seg[0]; val = seg[1] if len(seg) > 1 else ""
                 if s_i:
                     x += gap_tight if (val == "/" or prev == "/") else gap_seg
-                if kind == "chip":
-                    w = max(side, bold.size(val)[0] + max(6, int(sz * 0.5)))
-                else:
-                    w = reg.size(val)[0]
-                placed.append((kind, val, x, w))
-                x += w
-                prev = val
+                w = _seg_width(kind, val, sz, reg, bold, side)
+                placed.append((kind, val, x, w)); x += w; prev = val
         return placed, x, reg, bold, side
 
     sz = top
     while sz > floor and _layout(sz)[1] > avail:
         sz -= 1
     placed, _, reg, bold, side = _layout(sz)
-
-    ox = rect.x + 8
-    cy = rect.y + rect.height // 2
+    ox = rect.x + 8; cy = rect.y + rect.height // 2
     for kind, val, x, w in placed:
-        if kind == "chip":
-            chip = pygame.Rect(ox + x, cy - side // 2, w, side)
-            pygame.draw.rect(surface, hi, chip, border_radius=3)
-            g = bold.render(val, True, (0, 0, 0))
-            surface.blit(g, (chip.centerx - g.get_width() // 2,
-                             chip.centery - g.get_height() // 2))
+        _draw_seg(surface, ox + x, cy, kind, val, sz, reg, bold, side, hi, label_c)
+
+
+def render_button_line(fonts, size, theme, segments):
+    """Render a single in-window prompt line (e.g. 'Press [B] to close.')
+    to a Surface the caller can blit wherever it likes. ``segments`` is a
+    flat list of (kind, value): ("txt", "..."), ("chip", "B"),
+    ("dpad",)/("updown",)/("leftright",). Text carries its own spacing;
+    chips/symbols get a hair of padding so they don't touch the words."""
+    reg = fonts.get(size); bold = fonts.get(size, bold=True)
+    side = int(reg.get_height() * 0.9)
+    pad = max(2, int(size * 0.14))
+    hi = tuple(theme["highlight_color"])
+    label_c = tuple(theme.get("legend_text_color", theme.get("text_color", (230, 230, 230))))
+
+    total = 0
+    for kind, *rest in segments:
+        val = rest[0] if rest else ""
+        w = _seg_width(kind, val, size, reg, bold, side)
+        total += w + (2 * pad if kind != "txt" else 0)
+    h = max(side, reg.get_height())
+    surf = pygame.Surface((max(1, total), h), pygame.SRCALPHA)
+    x = 0; cy = h // 2
+    for kind, *rest in segments:
+        val = rest[0] if rest else ""
+        if kind != "txt":
+            x += pad
+        w = _draw_seg(surf, x, cy, kind, val, size, reg, bold, side, hi, label_c)
+        x += w + (pad if kind != "txt" else 0)
+    return surf
+
+
+_PROMPT_BUTTONS = {
+    "A": "A", "B": "B", "X": "X", "Y": "Y",
+    "L1": "L1", "R1": "R1", "L2": "L2", "R2": "R2",
+    "Start": "ST", "Select": "SEL", "Sel": "SEL",
+}
+
+
+def render_prompt(font, theme, text):
+    """Render an in-window prompt string to a Surface, drawing recognised
+    gamepad button tokens (A/B/X/Y/L1/R1/Start/Select) as chips and the
+    rest as plain text. Takes the caller's own font (works with auto-fitted
+    fonts). Tokens match exactly and case-sensitively, so the article 'a'
+    and lowercase labels like 'select' stay text. Whitespace is preserved."""
+    import re
+    side = int(font.get_height() * 0.9)
+    hi = tuple(theme["highlight_color"])
+    label_c = tuple(theme.get("legend_text_color",
+                              theme.get("text_color", (230, 230, 230))))
+
+    segs = []
+    for p in re.split(r"(\s+)", text):
+        if not p:
+            continue
+        core = p.rstrip(".,:;!")
+        tail = p[len(core):]
+        if core in _PROMPT_BUTTONS:
+            segs.append(("chip", _PROMPT_BUTTONS[core]))
+            if tail:
+                segs.append(("txt", tail))
         else:
-            t = reg.render(val, True, label_c)
-            surface.blit(t, (ox + x, cy - t.get_height() // 2))
+            segs.append(("txt", p))
+
+    def _chip_w(glyph):
+        font.set_bold(True); w = font.size(glyph)[0]; font.set_bold(False)
+        return max(side, w + max(6, int(font.get_height() * 0.5)))
+
+    total = sum(_chip_w(v) if k == "chip" else font.size(v)[0] for k, v in segs)
+    h = max(side, font.get_height())
+    surf = pygame.Surface((max(1, total), h), pygame.SRCALPHA)
+    x = 0; cy = h // 2
+    for kind, val in segs:
+        if kind == "chip":
+            w = _chip_w(val)
+            r = pygame.Rect(x, cy - side // 2, w, side)
+            pygame.draw.rect(surf, hi, r, border_radius=3)
+            font.set_bold(True)
+            g = font.render(val, True, (0, 0, 0))
+            font.set_bold(False)
+            surf.blit(g, (r.centerx - g.get_width() // 2, r.centery - g.get_height() // 2))
+            x += w
+        else:
+            t = font.render(val, True, label_c)
+            surf.blit(t, (x, cy - t.get_height() // 2))
+            x += t.get_width()
+    return surf

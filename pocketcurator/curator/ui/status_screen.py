@@ -174,7 +174,8 @@ class StatusScreen:
                 surface.blit(vs, (box.x + pad + label_w, y))
                 y += line_h
 
-        hint = small_font.render(hint_text, True, muted)
+        from ..render import render_prompt
+        hint = render_prompt(small_font, theme, hint_text)
         surface.blit(hint, (box.x + pad, box.bottom - hint.get_height() - pad))
 
     @staticmethod

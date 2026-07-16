@@ -283,8 +283,8 @@ class ConfirmDeleteScreen:
                 surf = body_font.render(line, True, tuple(theme["text_color"]))
                 surface.blit(surf, (box.x + pad, y))
                 y += surf.get_height() + 4
-            hint = small_font.render("Press A or B to continue.",
-                                     True, tuple(theme["muted_color"]))
+            from ..render import render_prompt
+            hint = render_prompt(small_font, theme, "Press A or B to continue.")
             surface.blit(hint, (box.x + pad,
                                 box.bottom - hint.get_height() - pad))
             return
@@ -353,6 +353,6 @@ class ConfirmDeleteScreen:
             surface.blit(warn,
                          (box.x + pad, box.bottom - warn.get_height() - pad - 24))
 
-        hint = body_font.render("A / X: confirm   -   B: cancel",
-                                True, tuple(theme["text_color"]))
+        from ..render import render_prompt
+        hint = render_prompt(body_font, theme, "A / X: confirm   -   B: cancel")
         surface.blit(hint, (box.x + pad, box.bottom - hint.get_height() - pad))

@@ -2,6 +2,14 @@
 
 All notable changes to Pocket Curator are documented here.
 
+## [1.1.2] - 2026-07-16
+
+A fetch-routing fix and a uniform button-hint restyle.
+
+- Fixed SNES (and any system) routing to the wrong folder on firmwares that give two systems the same EmulationStation name: the folder that actually matches now wins, so a remote 'snes' folder lands in roms/snes rather than a same-named neighbour.
+- Button hints across every screen and pop-up now read as chips in your highlight colour, with a d-pad symbol for "navigate" and up/down and left/right triangles on the Settings screen.
+- The version shown in the app no longer includes the internal build stamp.
+
 ## [1.1.1] - 2026-07-15
 
 Fetch destination fixes and a refreshed hint bar.

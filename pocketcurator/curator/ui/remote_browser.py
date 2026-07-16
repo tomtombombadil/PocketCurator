@@ -263,18 +263,24 @@ class RemoteBrowserScreen:
         """Every name a device system answers to - shortname, its roms
         folder's leaf, and all aliases of both - maps to that system."""
         out: Dict[str, dict] = {}
-        # TWO-PASS: exact shortnames and folder leafs claim their names
-        # first, then aliases fill the gaps. Critical on firmwares that
-        # ship region variants as separate systems (ROCKNIX has both
-        # megadrive AND genesis, nes AND famicom): a remote 'genesis'
-        # folder must hit the device's genesis, not megadrive-by-alias.
+        # PRIORITY: a folder leaf claims its name before ANY system's
+        # shortname does, then shortnames fill gaps, then aliases. This
+        # matters on firmwares that ship region variants as separate
+        # systems (ROCKNIX has both megadrive AND genesis), and it's
+        # essential when two systems share an ES <name> but live in
+        # different folders - dArkOS names BOTH SuFami Turbo (/roms/sufami)
+        # and Super NES (/roms/snes) "snes". We're routing a remote FOLDER,
+        # so the device folder that actually matches must win: a remote
+        # 'snes' folder has to land in /roms/snes, not in the SuFami system
+        # that merely happens to be named 'snes' and was listed first.
         # Keys are NORMALISED (lowercase, no punctuation) so 'pc-engine',
         # 'pc engine' and 'pcengine' all land on the same system.
-        for s in self.all_systems:                       # pass 1: exact
-            out.setdefault(_norm(s["shortname"]), s)
+        for s in self.all_systems:                       # pass 0: folder leaf
             leaf = _norm(Path(str(s.get("path", ""))).name)
             if leaf:
                 out.setdefault(leaf, s)
+        for s in self.all_systems:                       # pass 1: shortname
+            out.setdefault(_norm(s["shortname"]), s)
         for s in self.all_systems:                       # pass 2: aliases
             names = set(expand_names(s["shortname"]))
             leaf = Path(str(s.get("path", ""))).name

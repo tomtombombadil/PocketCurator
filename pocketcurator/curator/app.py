@@ -614,7 +614,7 @@ class App:
             msg_font = self.fonts.get(ui["font_size_base"])
             ver_font = self.fonts.get(max(10, int(ui["font_size_base"] * 0.6)))
 
-            from . import __version__, __build__
+            from . import __version__
 
             if img is not None:
                 ix = (self.screen_w - img.get_width()) // 2
@@ -642,7 +642,7 @@ class App:
                 msg,
                 ((self.screen_w - msg.get_width()) // 2, msg_baseline))
 
-            ver = ver_font.render(f"v{__version__}  build {__build__}",
+            ver = ver_font.render(f"v{__version__}",
                                   True, tuple(theme["muted_color"]))
             self.surface.blit(
                 ver,

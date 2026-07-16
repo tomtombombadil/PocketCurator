@@ -61,7 +61,8 @@ class ExitPromptScreen:
                      ((screen_w - title.get_width()) // 2,
                       surface.get_height() // 2 - title.get_height()))
 
-        hint = hint_font.render(hint_text, True, tuple(theme["legend_text_color"]))
+        from ..render import render_prompt
+        hint = render_prompt(hint_font, theme, hint_text)
         surface.blit(hint,
                      ((screen_w - hint.get_width()) // 2,
                       surface.get_height() // 2 + hint.get_height()))

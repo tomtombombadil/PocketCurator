@@ -247,7 +247,15 @@ class OSKScreen:
                 surface.blit(ks, (rect.centerx - ks.get_width() // 2,
                                   rect.centery - ks.get_height() // 2))
 
-        legend = ("A select   B delete   X 123/ABC   Y shift   "
-                  "Start OK   Select cancel")
-        ls = small.render(legend, True, muted)
-        surface.blit(ls, (box.x + pad, box.bottom - pad // 2 - ls.get_height()))
+        from ..render import draw_hint_bar
+        legend_rect = pygame.Rect(
+            box.x, box.bottom - pad // 2 - small.get_linesize(),
+            box.w, small.get_linesize())
+        draw_hint_bar(surface, legend_rect, self.app.fonts, base, theme, [
+            [("chip", "A"), ("txt", "select")],
+            [("chip", "B"), ("txt", "delete")],
+            [("chip", "X"), ("txt", "123/ABC")],
+            [("chip", "Y"), ("txt", "shift")],
+            [("chip", "SEL"), ("txt", "cancel")],
+            [("chip", "ST"), ("txt", "OK")],
+        ])

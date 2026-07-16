@@ -177,7 +177,8 @@ class UpdateScreen:
         if not footer and self.updater.busy():
             footer = "Working..."
         if footer:
-            hint = small_font.render(footer, True, muted)
+            from ..render import render_prompt
+            hint = render_prompt(small_font, theme, footer)
             surface.blit(hint,
                          (box.x + pad, box.bottom - hint.get_height() - pad))
 
